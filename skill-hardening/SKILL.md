@@ -69,6 +69,16 @@ patching a weak skill dimension-by-dimension usually costs more than re-authorin
 - Keep facts that age (models, prices, versions) in one place in the file, dated, so the next
   hardening pass finds them in one grep.
 
+## Automated drift check — `scripts/skill-sync.sh`
+
+Run `scripts/skill-sync.sh [skills-dir]` (default `~/.claude/skills`) to mechanise step 3 of
+the audit: it reads each live SKILL.md's sync-home footer, resolves the declared twin, and
+reports per skill — `OK`, `DRIFT`, `SANITIZED` (differs by design — review manually),
+`MISSING` twin, `LOCAL-ONLY`, or `NO-FOOTER` (an R9 failure in itself) — plus the twin
+repo's git dirt/ahead-behind state. Exit code is non-zero when drift or missing twins exist,
+so it slots into a cron or session-start hook. Run it whenever a skill feels stale, and
+before any release that ships skill copies.
+
 ## Named failure modes
 
 | Failure mode | What it looks like | Antidote |
