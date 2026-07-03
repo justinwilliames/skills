@@ -54,7 +54,6 @@ The gap between a frontier model and a merely good one is mostly *operating disc
 | [claude-memory](claude-memory/SKILL.md) | Tiered memory system (session → project → global → federated) with backup, doctor, ledger, and hook scripts |
 | [session-namer](session-namer/SKILL.md) | Generates clean, searchable session names from Claude Code conversation history via headless automation |
 | [posthog-design-customization](posthog-design-customization/SKILL.md) | PostHog dashboard colour-theming protocol via browser-fetch PATCH; documents the MCP field-stripping workaround |
-| [claude-design-email-header](claude-design-email-header/SKILL.md) | Drives Anthropic's Claude Design web app via Chrome to produce on-brand email headers; rasterizes to PNG |
 | [slack-status](slack-status/SKILL.md) | Sets Slack status via three-tier auth ladder (in-page fetch → self-copied session token → xoxp app token) |
 | [testing-standards](testing-standards/SKILL.md) | Project-scoped testing doctrine: fill-in-the-blank spec, surface coverage map, and per-layer verification gates |
 
