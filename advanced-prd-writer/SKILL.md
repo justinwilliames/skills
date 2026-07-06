@@ -220,6 +220,8 @@ Drop nits unless trivial. Drop findings the user has explicitly accepted as out 
 
 ### Step C4 — Deliver the audit
 
+> **Gold exemplar:** `gold/critique-exemplar.md` — annotated reference audit. Match its severity calibration, authority-citation discipline, and Before/After concreteness.
+
 Format:
 
 ```markdown
@@ -303,8 +305,8 @@ These are derived from the universal positions Doshi, Cutler, Norton, Mehta, Ama
 
 If the user cannot supply required evidence (customer data, baseline metric), block and ask — do not fabricate inputs.
 
-*Skill version 1.3. Canon: Marty Cagan (SVPG), Lenny Rachitsky, Shreyas Doshi, Amazon Working Backwards, John Cutler, Ravi Mehta, Reforge, Aakash Gupta. v1.3 adds the LLM Context working-memory block (Step 4.C) to every long-lived shape.*
+*Skill version 1.3. Canon: Marty Cagan (SVPG), Lenny Rachitsky, Shreyas Doshi, Amazon Working Backwards, John Cutler, Ravi Mehta, Reforge, Aakash Gupta. Maintainer: Justin Williames. v1.3 adds the LLM Context working-memory block (Step 4.C) to every long-lived shape.*
 
 ---
 
-Sync home: canonical = your live private copy; public sanitized twin: ~/code/skills/advanced-prd-writer → github.com/justinwilliames/skills. Sanitization is a sync step.
+Sync home: canonical = this live copy; public sanitized twin: ~/code/skills/advanced-prd-writer → github.com/justinwilliames/skills. Sanitization is a sync step.
