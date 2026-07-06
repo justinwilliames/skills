@@ -247,6 +247,8 @@ Haiku 4.5 is ~3× cheaper than Sonnet on input and faster end-to-end. For tasks 
 
 **Anti-pattern:** routing code-chunk work to Haiku to save money. The Sonnet→Haiku cost savings are real but Haiku will silently miss subtleties — wrong null-handling, wrong import order, wrong test framework — that Sonnet catches. False economy. The Haiku tier earns its keep on tasks where the verification surface is *trivial* (schema check, string equality, lint pass), not "looks like working code".
 
+**If Fable 5 is unavailable** (access lapsed, model retired, 400/404 on spawn): do not stall or downgrade silently. The replacement for an apex delegate is **ultrathink on Opus 4.8 + an independent Codex `--effort high` pass on the same sub-problem**, reconciled by the orchestrator — depth via forced thinking budget, blind-spot coverage via cross-family diversity. Note in the run log that the apex tier was substituted.
+
 ## 1M Context Routing — a fresh 1M session as a delegation target (never the orchestrator seat)
 
 **The rule, stated bluntly.** The orchestrator session stays **lean** — full stop. A 1M read surface is a *target*, not a *seat*. Opus 4.8 now ships a native 1M window at standard pricing, so the old *cost* argument ("the premium above 200K burns cash") is gone — but the rule stands on its other leg: the orchestrator's job (decompose, review diffs, reconcile reviews, talk to the user) is small-context work, and pouring 1M of source into the seat degrades reasoning quality and trashes the prompt cache regardless of price. Keep huge read surfaces in a **fresh** delegate session and the orchestrator stays sharp. If the orchestrator session itself is hitting 75%+ context, the right move is **handoff** (cheap, clean, deterministic), not bloating the seat.
