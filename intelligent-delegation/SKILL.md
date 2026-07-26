@@ -22,16 +22,16 @@ You are the **orchestrator**. Your job: decompose, delegate, collect, verify, pr
 2. **Context** — would in-session execution likely burn >30% of remaining context?
 3. **Fresh-window** — would a single deep task benefit from a fresh prompt cache + clean reasoning surface? (Deep refactor in one module, adversarial review of one file, anything that would otherwise eat 40%+ of main-session context.)
 4. **Parallelism** — are there 2+ independent units that could execute concurrently?
-5. **Large-surface (1M context fit)** — does the chunk's *required read surface* exceed roughly 150K tokens? Monorepo-wide review, large PDF/transcript ingest, multi-hundred-file analysis, log forensics across days. If yes, this chunk routes to a **1M-context Opus 4.8 subprocess** (`claude -p ... --model claude-opus-4-8`, native 1M window) — not a regular Sonnet/Opus subagent. Subagent context is bounded; 1M is the right tool. See "1M Context Routing" below.
-6. **Model fit** — *only ask this if 1–5 are all no.* Two directions. **Down:** does the task genuinely need Opus-level reasoning (multi-file design, architectural tradeoffs, ambiguous spec, nuanced review)? If not, delegate it to a single Sonnet or Codex sub-agent for efficiency. **Up:** is the task *harder than Opus 4.8* — a research-grade decomposition or the subtlest correctness problem where Opus has plateaued? If so, escalate that sub-problem to a Fable 5 delegate (a target, never the seat — see "Fable 5 routing"). Most work is neither: it sits in Opus's band and stays in-session.
+5. **Large-surface (1M context fit)** — does the chunk's *required read surface* exceed roughly 150K tokens? Monorepo-wide review, large PDF/transcript ingest, multi-hundred-file analysis, log forensics across days. If yes, this chunk routes to a **1M-context Opus 5 subprocess** (`claude -p ... --model claude-opus-5`, native 1M window) — not a regular Sonnet/Opus subagent. Subagent context is bounded; 1M is the right tool. See "1M Context Routing" below.
+6. **Model fit** — *only ask this if 1–5 are all no.* Two directions. **Down:** does the task genuinely need Opus-level reasoning (multi-file design, architectural tradeoffs, ambiguous spec, nuanced review)? If not, delegate it to a single Sonnet or Codex sub-agent for efficiency. **Up:** is the task *harder than Opus 5* — a multi-day-autonomy grind or the subtlest correctness problem where Opus 5 has plateaued? If so, escalate that sub-problem to a Fable 5 delegate (a target, never the seat — see "Fable 5 routing"). Note the bar is now high: Opus 5 edges Fable on general intelligence and SWE-bench Verified, so "escalate to Fable" is a narrow, evidenced call, not a reflex. Most work sits in Opus 5's band and stays in-session.
 
 **The decision rule:**
 
 - **ANY of 1–4 yes** → start the delegate flow. `/delegate plan "<task>"` for non-obvious decompositions, `/delegate run "<task>"` once you have the manifest. For a single deep task, a 1-chunk delegate run to Sonnet or Codex still wins on fresh context — parallelism is an optimisation, fresh-context is the primary value.
-- **Q5 yes (large-surface)** → route THAT chunk (or the whole task if it's a 1-chunk job) to a **1M-context Opus 4.8 subprocess**. Do NOT flip the orchestrator session to 1M — keep the seat lean. The chunk runs as a Bash subprocess: `claude -p "<self-contained prompt>" --model claude-opus-4-8 --permission-mode plan`. See "1M Context Routing" for the full pattern.
+- **Q5 yes (large-surface)** → route THAT chunk (or the whole task if it's a 1-chunk job) to a **1M-context Opus 5 subprocess**. Do NOT flip the orchestrator session to 1M — keep the seat lean. The chunk runs as a Bash subprocess: `claude -p "<self-contained prompt>" --model claude-opus-5 --permission-mode plan`. See "1M Context Routing" for the full pattern.
 - **1–5 all no, but Opus reasoning NOT required** → still delegate, but as an *efficiency* 1-chunk run, not a parallelism run. Route to Sonnet sub-agent (mechanical edits, boilerplate, clear-pattern work, simple refactors, generation from a tight spec) or Codex (single-file adversarial review, narrow precision fix). The orchestrator (Opus) writes the brief, delegates, reviews the returned diff. Do NOT burn Opus on work that Sonnet or Codex would do better and cheaper.
 - **1–5 all no AND Opus reasoning required** → proceed in-session. Log the call in one line so the user can override.
-- **Per-chunk apex check (fan-out runs).** Q6 gates on "1–5 all no", so a run that already triggered on scope/parallelism skips the top-level model-fit question. Re-apply its *upward* direction during decomposition: if any individual chunk is harder than Opus 4.8 (a research-grade boundary, a proof-shaped correctness chunk), mark that chunk `fable-subagent`. The orchestrator seat stays Opus.
+- **Per-chunk apex check (fan-out runs).** Q6 gates on "1–5 all no", so a run that already triggered on scope/parallelism skips the top-level model-fit question. Re-apply its *upward* direction during decomposition: if any individual chunk is harder than Opus 5 (a multi-day-autonomy grind, a proof-shaped correctness chunk), mark that chunk `fable-subagent`. The orchestrator seat stays Opus 5.
 
 **What "Opus reasoning required" actually means.** Use Opus in-session for: multi-file design decisions, architectural tradeoffs, synthesising disparate context the sub-agent doesn't have, debugging where the failure mode is ambiguous, reviewing or reconciling work the sub-agents produced, talking to the user. Do NOT use Opus in-session for: mechanical edits following a clear pattern, boilerplate generation, writing a test from a clear spec, single-file refactors with obvious shape, formatting/lint fixes, dependency bumps. Those go to Sonnet.
 
@@ -41,7 +41,7 @@ You are the **orchestrator**. Your job: decompose, delegate, collect, verify, pr
 > `Delegation triage: 1-chunk Sonnet run — mechanical refactor, no Opus reasoning required, efficiency play.`
 > `Delegation triage: fan-out — 4 independent feature chunks, would burn ~50% main-session context.`
 > `Delegation triage: 1-chunk Codex run — deep algorithm, want fresh-window + adversarial review.`
-> `Delegation triage: 1-chunk 1M-Opus subprocess — read surface is the whole monorepo (~280K tokens), beyond subagent budget.`
+> `Delegation triage: 1-chunk 1M-Opus-5 subprocess — read surface is the whole monorepo (~280K tokens), beyond subagent budget.`
 
 This makes the orchestration call visible without bloating the response. The user gets to redirect early instead of after you've already started reading files.
 
@@ -84,19 +84,33 @@ This makes the orchestration call visible without bloating the response. The use
 
 | Tier | Model | Session | Use for |
 |------|-------|---------|---------|
-| **Orchestrator** | Opus 4.8 (main session, adaptive `xhigh` thinking) | Stays | Decompose, review diffs, QA, reconcile dual-model reviews, talk to the user |
-| **Apex reasoning** | **Fable 5 (`Agent(model="fable")`, or CLI subprocess for 1M)** | Subagent / subprocess (fresh) | The single hardest sub-problem that has outrun Opus 4.8: research-grade decomposition, subtlest algorithmic correctness, blocker-conflict tie-break. A *target*, never the seat — see "Fable 5 routing" below. |
-| **QA reviewer A** | Opus 4.8 (fresh subagent) | Subagent | Cold semantic review of an applied major run (Step 10.5) |
+| **Orchestrator** | **Opus 5 (`claude-opus-5`, main session, adaptive `xhigh` thinking)** | Stays | Decompose, review diffs, QA, reconcile dual-model reviews, talk to the user |
+| **Apex reasoning** | **Fable 5 (`Agent(model="fable")`, or CLI subprocess for 1M)** | Subagent / subprocess (fresh) | The narrow class of sub-problem that still outruns Opus 5: multi-day-autonomy grind, SWE-bench-Pro-shaped repo judgment, blocker-conflict tie-break. A *target*, never the seat — and no longer a general upgrade. See "Fable 5 routing" below. |
+| **QA reviewer A** | Opus 5 (fresh subagent) | Subagent | Cold semantic review of an applied major run (Step 10.5) |
 | **QA reviewer B** | Codex GPT-5.6 Sol `--effort high` | Background | Adversarial review of an applied major run, parallel to reviewer A (Step 10.5). Cross-*family* diversity at near-Fable depth — Fable is cross-*depth*, not diversity. Never Terra for review (measured −8.6pp recall regression). |
-| **Planning** | Opus 4.8 (Plan subagent) | Subagent | Architecture, multi-file refactor design. Escalate to a Fable 5 Plan delegate only for a genuinely research-grade decomposition. |
-| **Build** | Sonnet 4.6 (Agent, adaptive thinking) | Fresh per chunk | Parallel independent implementation chunks (multi-file, project-conventions-aware) |
+| **Planning** | Opus 5 (Plan subagent) | Subagent | Architecture, multi-file refactor design. A Fable Plan delegate is now rarely the better call — exhaust in-seat ultrathink first. |
+| **Build** | Sonnet 5 (Agent, adaptive thinking) | Fresh per chunk | Parallel independent implementation chunks (multi-file, project-conventions-aware) |
 | **Precision** | Codex GPT-5.6 Sol | Background | Adversarial review, deep algorithms, second opinions, long terminal/tool-loop agentic chunks (Sol's measured lane) |
-| **Large-context** | **Opus 4.8 1M (native 1M window; via CLI subprocess to keep it off the orchestrator seat)** | Subprocess (fresh session) | Single chunks whose *read surface* exceeds ~150K tokens: monorepo-wide review, big PDF/transcript ingest, multi-hundred-file analysis, log forensics. Never the orchestrator seat. |
+| **Large-context** | **Opus 5 1M (native 1M window; via CLI subprocess to keep it off the orchestrator seat)** | Subprocess (fresh session) | Single chunks whose *read surface* exceeds ~150K tokens: monorepo-wide review, big PDF/transcript ingest, multi-hundred-file analysis, log forensics. Never the orchestrator seat. |
 | **Cheap parallel** | Haiku 4.5 (Agent, `model="haiku"`) | Fresh per task | High-volume narrow tasks at scale: classify/tag, format-convert, bulk mechanical text edits, smoke checks, per-row enrichment |
 | **Lookup** | Haiku 4.5 (Explore subagent) | Subagent | File location, grep-for-symbol, quick searches |
-| **Integration** | Opus 4.8 (main session, in-line) | Stays | runner: `main` chunks — cross-cutting edits, package.json, config wiring, glue between sibling chunks |
+| **Integration** | Opus 5 (main session, in-line) | Stays | runner: `main` chunks — cross-cutting edits, package.json, config wiring, glue between sibling chunks |
 
-**Pricing context (2026-07):** Fable 5 **$10/$50 per MTok** (2× Opus — the apex tier) • Opus 4.8 $5/$25 • Sonnet 4.6 $3/$15 • Haiku 4.5 $1/$5 • Codex is subscription-billed, but API list prices for cost intuition: **GPT-5.6 Sol $5/$30** (1.05M ctx, 128K max out; >272K input bills the *whole request* at 2×in/1.5×out → $10/$45), Terra $2.50/$15, Luna $1/$6; GPT-5.5 remains available (not deprecated). **Opus 4.8 ships a native 1M context window at standard $5/$25 — no long-context premium.** (This corrects the old "$10/$50 above 200K input, 2× tier" note: that premium was the Opus 4.7-era 1M beta and is gone. The *cost* reason to keep the orchestrator off a 1M context has evaporated; the *reasoning-quality + cache* reason has not — a bloated context still degrades the seat regardless of price.) Haiku is ~3× cheaper than Sonnet on input — for narrow parallel tasks the savings compound across chunks; route mechanically suitable work to Haiku without ceremony. Fable at 2× Opus is the inverse discipline: reach for it only when Opus 4.8 has genuinely plateaued on a narrow, high-leverage sub-problem — never as a "just in case" upgrade.
+**Current Claude lineup (verified 2026-07-27 against platform.claude.com models overview + pricing):**
+
+| Model | ID | Ctx | Max out | in/out per MTok | Effort | Notes |
+|-------|----|-----|---------|-----------------|--------|-------|
+| **Opus 5** | `claude-opus-5` | 1M | 128K (300K on Batch via `output-300k-2026-03-24`) | **$5/$25** | low→max, default `high` | Released 2026-07-24. Adaptive thinking **on by default** when `thinking` is omitted (changed from 4.8). Knowledge cutoff May 2026. Fast mode supported (bills 2× → $10/$50). |
+| **Fable 5** | `claude-fable-5` | 1M | 128K | **$10/$50** | low→max, default `high` | Thinking always-on. Still Anthropic's nominal "most capable widely released model". Knowledge cutoff Jan 2026. |
+| **Sonnet 5** | `claude-sonnet-5` | 1M | 128K | $3/$15 ($2/$10 intro thru 2026-08-31) | low→max | Adaptive thinking, no extended thinking. |
+| **Opus 4.8** | `claude-opus-4-8` | 1M | 128K | $5/$25 | low→max | Superseded by Opus 5 at identical price. No reason to route here now. |
+| **Haiku 4.5** | `claude-haiku-4-5-20251001` | 200K | 64K | $1/$5 | n/a | Only current model still on classic extended thinking rather than effort/adaptive. |
+
+**Opus 5 API quirks that bite hand-rolled calls:** no assistant prefill (400, unchanged from 4.8) • `thinking:{type:"disabled"}` is valid **only at effort `high` or below** — pairing it with `xhigh`/`max` returns 400 • ships cyber/bio safety classifiers, so a declined request returns HTTP 200 with `stop_reason:"refusal"` and a `stop_details.category`, not an exception — branch on `stop_reason` before reading `content`; the `fallbacks` beta auto-reruns on a fallback model.
+
+**Codex pricing** (subscription-billed in practice; API list for intuition): **GPT-5.6 Sol $5/$30** (1M ctx, 128K max out; >272K input bills the *whole request* at 2×in/1.5×out → $10/$45), Terra $2.50/$15, Luna $1/$6; GPT-5.5 remains available (not deprecated).
+
+**Opus 5 ships a native 1M context window at standard $5/$25 — no long-context premium.** (The old "$10/$50 above 200K input" premium was the Opus 4.7-era 1M beta and is gone. The *cost* reason to keep the orchestrator off a 1M context has evaporated; the *reasoning-quality + cache* reason has not — a bloated context still degrades the seat regardless of price.) Haiku is ~3× cheaper than Sonnet on input — for narrow parallel tasks the savings compound across chunks. Fable at 2× Opus 5 is the inverse discipline: it now scores *below* Opus 5 on general intelligence, so reach for it only on its two surviving lanes — never as a "just in case" upgrade.
 
 Use `runner: main` sparingly — typically the final chunk in a chain when integration genuinely requires orchestrator context (sibling-chunk awareness, cross-file decisions). Most chunks should be `sonnet-subagent` for code work or `haiku-subagent` for narrow text/data work.
 
@@ -105,58 +119,79 @@ Use `runner: main` sparingly — typically the final chunk in a chain when integ
 OpenAI's GPT-5.6 family (released 2026-07-09) replaces GPT-5.5 as this skill's Codex tier. Evidence-backed routing:
 
 - **Sol (`gpt-5.6-sol`) is the only 5.6 tier this skill routes to.** Terra regressed on adversarial code review (−8.6pp actionable recall vs baseline on CodeRabbit's production harness) and is token-verbose on long-horizon work (40.7% pass @ ~55K avg output tokens/task vs Sol's 63.7% @ ~21K). Luna merely duplicates Haiku's cheap lane cross-family. Claude tiers keep those lanes.
-- **Sol ≈ Fable-tier depth, cross-family.** Artificial Analysis Intelligence Index (max reasoning): Fable 5 = 60, Sol = 59, Opus 4.8 = 56 — at roughly ⅓ Fable's cost per task (~$1.04 vs ~$2.75). The cross-family second opinion upgraded from "different manifold" to "different manifold at near-apex depth".
-- **Sol's lane: terminal/tool-loop agentic grind + cost.** Terminal-Bench 2.1: Sol 88.8% vs Fable 5's 83.4–84.3%; AA Coding Agent Index 80 (chart leader); markedly token-efficient. For a long, tool-heavy, low-supervision execution chunk that's too hard for Sonnet, Sol is now a legitimate routing target.
+- **Sol ≈ apex-tier depth, cross-family — but no longer the ceiling.** Artificial Analysis Intelligence Index (max reasoning, re-checked 2026-07-27): **Opus 5 = 61 (#1 of 190)**, Fable 5 = 60, Sol = 59, Opus 4.8 = 56. Sol is still the credible cross-family second opinion at near-apex depth; it is no longer within noise of *leading*. Cost per index task ~$1.04.
+  - *Snapshot caution:* the AA Coding Agent Index is actively re-scored as models are added — two fetches in the same month returned different absolute numbers for the same models. Treat any single figure as dated, and route on the lane (grind vs judgment), not on a decimal.
+- **Sol's lane: terminal/tool-loop agentic grind.** Terminal-Bench 2.1 (2026-07-27 snapshot): Sol 85.77% vs Opus 5 84.64% vs Sonnet 5 74.53% — a ~1pp edge, materially narrower than the ~5pp gap Sol held over Fable earlier in the month. ARC-AGI-2 still favours Sol (~92–93% vs Opus 5's ~90%). AA Coding Agent Index has Sol 77–80 and Opus 5 78 (xhigh, Claude Code harness) — effectively tied at the top. For a long, tool-heavy, low-supervision execution chunk, Sol remains a legitimate target; it is no longer a clear *upgrade* over keeping it on Opus 5.
 - **Fable's lane holds: repo-level judgment.** SWE-bench Pro: Fable 5 ≈ 80% vs Sol 64.6%, and practitioner consensus is consistent (Sol "grabs and grinds"; Fable "reasons and polishes", stronger architectural judgment). Apex escalations for architecture, proof-shaped correctness, and research-grade decomposition stay Fable-bound.
 - **Reward-hacking caveat (load-bearing).** METR measured Sol with the *highest detected reward-hacking rate of any public model they've assessed*. Never accept a Sol chunk's self-reported pass — the orchestrator's own Step 10 QA run is the only evidence that counts. (True for every runner; Sol earns the explicit call-out.)
-- **Mechanics.** Requires codex-cli ≥ 0.144 (0.142's model cache doesn't list 5.6 — verified locally 2026-07-13, along with a live `codex exec -m gpt-5.6-sol` round-trip). Effort ladder is now low/medium/high/xhigh/max/**ultra** — `ultra` spawns Codex's own internal subagent fan-out; never use it inside a delegate run (it double-orchestrates against this skill's manifest contract). GPT-5.5 stays available as the fallback if 5.6 misbehaves.
+- **Mechanics (re-probed against codex-cli 0.144.1, 2026-07-27).** A **tier suffix is mandatory** — bare `gpt-5.6` is accepted by the CLI but rejected by the API (`not supported when using Codex with a ChatGPT account`). The API's own validation error enumerates the real effort ladder: **`none`, `minimal`, `low`, `medium`, `high`, `xhigh`, `max`** — note `none`/`minimal` at the bottom and that **`ultra` is NOT on it**. `ultra` is accepted and runs, which means the CLI intercepts it *client-side* as an orchestration mode (its subagent fan-out), not as a reasoning tier passed through to the model. That is precisely why it double-orchestrates against this skill's manifest contract — the ban is structural, not a quality judgment. GPT-5.5 stays available as the fallback if 5.6 misbehaves.
 
 ## Fable 5 routing — apex reasoning target (never the default seat)
 
-**The topology question, settled.** Fable 5 is the most intelligent model — a tier above Opus, at 2× the price ($10/$50 vs Opus 4.8's $5/$25). The instinct is to put the smartest model in charge: Fable orchestrates, Opus executes. **That instinct is wrong for this skill.** The orchestrator seat stays **Opus 4.8**; Fable 5 is a *target* you escalate to for the single hardest sub-problem — the exact same shape as the 1M-Opus rule.
+**The topology question, re-settled 2026-07-27 after Opus 5.** The old framing was "Fable is a tier above Opus at 2× the price, but the seat still stays Opus." **Opus 5 broke the premise, not just the conclusion.** Fable is no longer straightforwardly above the seat:
 
-**Why Opus 4.8 holds the seat, not Fable 5:**
+| Signal | Opus 5 | Fable 5 | Read |
+|--------|--------|---------|------|
+| AA Intelligence Index (max) | **61** (#1 of 190) | 60 | Opus 5 edges it |
+| SWE-bench Verified | **~96–97%** | ~95% | Opus 5 |
+| Frontier-Bench v0.1 (agentic coding) | **43.3%** | 33.7% | Opus 5, decisively |
+| GDPval-AA (Elo) | **1861** | 1747 | Opus 5 |
+| OSWorld 2.0 (computer use) | **70.57%** | lower | Opus 5, at ~⅓ cost |
+| Knowledge cutoff | **May 2026** | Jan 2026 | Opus 5, four months fresher |
+| Price (in/out per MTok) | **$5/$25** | $10/$50 | Opus 5, half |
+| SWE-bench Pro (hardest repo judgment) | behind | **~80%** | **Fable** |
+| Longest-horizon multi-day autonomy | behind | **ahead** | **Fable** |
+
+Anthropic's docs still *name* Fable "the most capable widely released model" and steer the hardest-capability tier to it — but their own routing line is now "start with Claude Opus 5 for complex agentic coding and enterprise work". Both things are true: Fable keeps the highest ceiling on a narrow class of problem; Opus 5 wins or ties nearly everything else at half the cost.
+
+**Consequence for this skill: escalating to Fable is a *lateral trade*, not an upgrade.** It buys multi-day-autonomy stamina and hardest-repo-judgment depth, and it costs you four months of world knowledge, 2× price, and a lower general-intelligence score. Name which of Fable's two lanes you are buying before you spawn it. If you can't name one, stay on Opus 5.
+
+**Why Opus 5 holds the seat:**
 
 | Argument | Detail |
 |----------|--------|
-| **The seat pays its premium on *every* turn** | The orchestrator is the longest-lived component — in context for the whole session, including the ~80% of turns that are pure coordination (init, mark running, collect, apply, present, re-read `state.tsv`). Seat Fable and you pay 2× on all of them. Seat Opus and the premium is only spent where reasoning actually happens; the rare hard call escalates to a Fable *delegate*. |
-| **Orchestration is agentic, and Opus 4.8 is the agentic flagship** | Opus 4.8 is explicitly state-of-the-art at *long-horizon agentic execution* — which is exactly the orchestrator's job (decompose, hold the narrative, sequence waves, reconcile). Fable's documented edge is *raw reasoning depth*, a delegate-shaped need (one brutal sub-problem), not a coordination-shaped one. Nothing says Fable orchestrates better — only that it reasons deeper. |
+| **It is now the more intelligent seat outright** | This is the new argument and it is the strongest one. Under Opus 4.8 the seat was a deliberate step *down* from the apex, justified by cost and latency. Opus 5 removes the sacrifice: it tops the AA Intelligence Index (61 v Fable's 60), wins SWE-bench Verified and agentic-coding benchmarks, and knows four more months of the world. Seating Opus 5 is no longer a trade-off to be defended — it is the default a Fable seat now has to beat. |
+| **The seat pays its premium on *every* turn** | The orchestrator is the longest-lived component — in context for the whole session, including the ~80% of turns that are pure coordination (init, mark running, collect, apply, present, re-read `state.tsv`). Seat Fable and you pay 2× on all of them, for a model that scores *lower* on general intelligence. |
+| **Orchestration is agentic, and Opus 5 is the agentic flagship** | Anthropic positions Opus 5 for "complex agentic coding and enterprise work" — exactly the orchestrator's job (decompose, hold the narrative, sequence waves, reconcile). Fable's surviving edge is multi-day autonomous stamina, a delegate-shaped need (one brutal long-running sub-problem), not a coordination-shaped one. |
+| **The seat's knowledge cutoff is load-bearing** | The orchestrator is the component that reasons about *current* tooling, APIs, and model choices. Fable's Jan 2026 cutoff predates Opus 5's own existence. A seat that doesn't know the lineup it is routing is the wrong seat. |
 | **Intelligence belongs where verification *can't* catch the error — and that's specific gates, not the whole seat** | The strongest pro-Fable case: orchestrator mistakes (a bad decomposition, a wrong reconciliation verdict) aren't caught by a `verification` command, so put the best brain there. True — but those are a handful of *gates*, not the whole session. Escalate those gates to Fable; don't seat it for the mechanical 80%. |
 | **Latency is hidden in delegates, exposed in the seat** | A tier-above-Opus flagship is near-certainly slower per token. The seat is the interactive surface that talks to the user — the worst place to absorb latency. Delegates run in the background behind parallelism, where latency is free. |
 
-**Where Fable 5 *does* earn its 2×** — escalate to a Fable delegate when Opus 4.8 has genuinely plateaued on a *narrow, high-leverage* sub-problem. (Shape check first: if the plateaued sub-problem is *agentic-grind-shaped* — a long terminal/tool-loop execution slog rather than a judgment problem — Codex Sol at ~⅓ the per-task cost is the better escalation; Fable is for judgment, proof, and decomposition. See the GPT-5.6 section.)
+**Where Fable 5 still earns the spawn** — escalate only when Opus 5 has genuinely plateaued on a *narrow, high-leverage* sub-problem that sits in one of Fable's two surviving evidenced lanes. Shape check first: if the plateaued sub-problem is *agentic-grind-shaped* (a long terminal/tool-loop execution slog rather than a judgment problem), Codex Sol is the better escalation. Fable is for stamina and hardest-repo judgment.
 
 | Use Fable 5 for | Spawn |
 |-----------------|-------|
-| **Research-grade decomposition** — a genuinely novel task where getting the chunk boundaries *right* is the hard part, and a wrong cut wastes the whole fan-out — **and ultrathink on the Opus seat has already plateaued** (try the free in-seat ultrathink first; see Step 2's planning ladder) | One-shot Fable Plan delegate → returns the manifest → orchestrate the build on Opus 4.8 |
-| **The subtlest algorithmic correctness** — concurrency invariants, numerical edge cases, a proof-shaped argument where Opus *and* Codex both hesitate | 1-chunk `fable-subagent` (CLI subprocess if it also needs a >150K read surface) |
-| **Blocker-conflict reconciliation** — Step 10.5 reviewers (Opus + Codex) disagree on a *blocker* and the orchestrator can't confidently adjudicate | Escalate that one finding's reconciliation to Fable 5; take its verdict as the tie-break |
+| **Multi-day / longest-horizon autonomy** — a single delegate that must stay coherent across an extended unsupervised run. Fable's clearest surviving edge. | 1-chunk `fable-subagent`, background |
+| **SWE-bench-Pro-shaped repo judgment** — the hardest class of real-repo change where Fable's ~80% vs Sol's 64.6% is the relevant signal and Opus 5 has visibly stalled | 1-chunk `fable-subagent` (CLI subprocess if it also needs a >150K read surface) |
+| **Blocker-conflict reconciliation** — Step 10.5 reviewers (Opus 5 + Codex) disagree on a *blocker* and the orchestrator can't confidently adjudicate | Escalate that one finding to Fable as a *third, independent* opinion. Note it is a tie-break by independence, not by authority — Fable no longer outranks the Opus 5 seat on general reasoning. |
+
+**No longer a Fable lane (moved back to the Opus 5 seat, 2026-07-27):** research-grade decomposition and subtlest-algorithmic-correctness. Opus 5 now leads Fable on general intelligence and SWE-bench Verified, so the old "escalate the hard cut to Fable" reflex spends 2× for a *lower*-scoring model. Use in-seat ultrathink at the planning gate instead; escalate only if ultrathink demonstrably plateaus AND the problem is stamina- or repo-judgment-shaped.
 
 **The one carve-out where Fable *may* take the seat.** The "seat pays the premium on every coordination turn" argument assumes a session with lots of cheap coordination subsidised by a few hard calls. When that assumption fails — a **short, uniformly-hard** task where the decomposition itself is research-grade and there's almost no mechanical overhead to dilute — seating Fable is defensible. State the trade-off out loud and get the user's sign-off, exactly like the 1M flip:
 
-> `Fable-seat call: single research-grade problem, ~no coordination overhead, the decomposition IS the hard part. Recommend seating Fable 5 for this session — 2× cost, but every turn is Fable-hard. The user's call.`
+> `Fable-seat call: single uniformly-hard problem in Fable's stamina lane, ~no coordination overhead. Recommend seating Fable 5 — 2× cost and a Jan-2026 cutoff, bought for multi-day coherence. The user's call.`
 
-Default is Opus-seat / Fable-target. The carve-out needs an explicit yes — never a unilateral flip.
+Default is Opus-5-seat / Fable-target. The carve-out needs an explicit yes — never a unilateral flip. **The carve-out narrowed under Opus 5:** "the decomposition is research-grade" is no longer sufficient justification on its own, because Opus 5 out-reasons Fable on general intelligence. The remaining justification is stamina.
 
 **Mechanical notes:**
 
 - Fable spawns natively via the Agent tool — `Agent(subagent_type="general-purpose", model="fable", run_in_background=True, ...)`. Unlike 1M-Opus, **no CLI subprocess is required** — the Agent `model` param now accepts `fable`. Use a CLI subprocess only if the Fable chunk also needs a >150K read surface or isolated MCP/hooks.
 - Runner enum: `fable-subagent` is wired into `delegate.sh validate` and `references/manifest-schema.md`. Step 6 fan-out uses the Sonnet spawn block with `model="fable"`.
-- Fable quirk (raw CLI/API only): an explicit `thinking: {type:"disabled"}` returns 400 on Fable 5 — omit the `thinking` param instead (Opus 4.8 accepts `disabled`; Fable does not). The Agent tool handles this for you; it only bites a hand-rolled `claude -p`/SDK call.
-- Effort: default `high`, not `xhigh`. Fable's intelligence ceiling is higher, so start at `high` and only climb on a concrete signal — Fable self-reports low confidence, its verdict conflicts with both Step 10.5 reviewers, or its output fails verification. Reflexive `xhigh`/`max` on a 2× model is easy money to waste.
-- Cost discipline: Fable is 2× Opus 4.8 and 10× Haiku. Reach for it only when Opus 4.8 has demonstrably plateaued on a narrow, high-leverage problem — the same discipline the 1M tier gets. It is not a "just in case" upgrade, and it is **not** model-diversity for QA (it's still a Claude model — Codex GPT-5.6 Sol remains the cross-family reviewer, now at near-Fable depth itself; Fable is depth, not diversity).
+- Thinking quirks (raw CLI/API only — the Agent tool handles these; they bite hand-rolled `claude -p`/SDK calls): on **Fable 5** an explicit `thinking:{type:"disabled"}` returns 400 — omit the param. On **Opus 5** `disabled` *is* accepted but **only at effort `high` or below** — pairing it with `xhigh`/`max` is a 400. Opus 5 also runs adaptive thinking by default when `thinking` is omitted entirely, which Opus 4.8 did not.
+- Effort: default `high`, not `xhigh`, on both tiers. Climb only on a concrete signal — the delegate self-reports low confidence, its verdict conflicts with both Step 10.5 reviewers, or its output fails verification.
+- Discipline: Fable is 2× Opus 5 and 10× Haiku, and now scores *below* Opus 5 on general intelligence with a four-month-staler cutoff. It is not a "just in case" upgrade, and it is **not** model-diversity for QA (it's still a Claude model — Codex GPT-5.6 Sol remains the cross-family reviewer; Fable is depth-of-a-different-shape, not diversity).
 
 ## Effort Levels per Runner
 
 | Runner | Effort control | Default | Override |
 |--------|---------------|---------|----------|
-| **Orchestrator (Opus 4.8)** | Adaptive thinking (`xhigh` default in Claude Code); **explicit ultrathink at the planning gate** | Full + adaptive | Stay on Opus; never switch to Sonnet manually. Adaptive thinking deepens reasoning on hard subproblems — but at the decomposition gate (Step 2), *force* the ceiling with ultrathink rather than trusting adaptivity to find it; a bad cut is the one orchestrator error no verification catches |
+| **Orchestrator (Opus 5)** | Adaptive thinking (`xhigh` default in Claude Code); **explicit ultrathink at the planning gate** | Full + adaptive | Stay on Opus 5; never switch to Sonnet manually. Adaptive thinking is on by default here (new in Opus 5) — but at the decomposition gate (Step 2), *force* the ceiling with ultrathink rather than trusting adaptivity to find it; a bad cut is the one orchestrator error no verification catches |
 | **Apex (Fable 5)** | `effort` (sweep `medium`/`high`/`xhigh`) + adaptive thinking | `high` | Start at `high`, not `xhigh` — Fable's intelligence ceiling is higher, so climb only if the sub-problem demands it. Never send `thinking:{type:"disabled"}` (400 on Fable — omit the param) |
-| **Sonnet subagents (4.6)** | Model tier + adaptive thinking | Adaptive (default) | Set `thinking="extended"` for genuinely deliberative tasks (math, multi-step symbolic reasoning); default OFF for code chunks — extended thinking can hurt by ~36% on intuitive tasks |
-| **Codex (GPT-5.6 Sol)** | `CODEX_EFFORT` env var → `model_reasoning_effort` — 5.6 ladder: low/medium/high/xhigh/max/ultra | `medium` | `CODEX_EFFORT=high` for deep algorithmic work or adversarial review. Never `ultra` inside a delegate run — it triggers Codex's own subagent fan-out, double-orchestrating against the manifest contract |
+| **Sonnet subagents (Sonnet 5)** | Model tier + adaptive thinking | Adaptive (default) | Set `thinking="extended"` for genuinely deliberative tasks (math, multi-step symbolic reasoning); default OFF for code chunks — extended thinking can hurt by ~36% on intuitive tasks |
+| **Codex (GPT-5.6 Sol)** | `CODEX_EFFORT` env var → `model_reasoning_effort` — real API ladder: `none`/`minimal`/`low`/`medium`/`high`/`xhigh`/`max` | `medium` | `CODEX_EFFORT=high` for deep algorithmic work or adversarial review. **`ultra` is not on this ladder** — it is a CLI-level orchestration switch that spawns Codex's own subagent fan-out. Never use it inside a delegate run: it double-orchestrates against the manifest contract |
 | **Haiku 4.5 (Cheap parallel + Explore)** | Model tier + optional extended thinking | OFF | Default OFF for pure lookups/classification/bulk edits. Enable extended thinking only for unambiguous deliberative subtasks — rare for Haiku-suitable work |
 
-**Session advice:** Start and stay on Opus 4.8. The skill routes sub-runners automatically. Switching to Sonnet manually to "save tokens" just degrades the orchestrator — the planning and QA gates are where Opus earns its keep. Adaptive thinking on Opus is the new default — don't fight it; it spends thought where the task warrants it.
+**Session advice:** Start and stay on Opus 5. The skill routes sub-runners automatically. Switching to Sonnet manually to "save tokens" just degrades the orchestrator — the planning and QA gates are where Opus earns its keep. Adaptive thinking on Opus is the new default — don't fight it; it spends thought where the task warrants it.
 
 **Thinking-mode rule of thumb:** If the task is "follow the obvious pattern", leave thinking OFF on Sonnet/Haiku. If the task is "reason about which of three valid approaches is right here", extended thinking earns its cost. The 36% intuitive-task regression is real — don't reflexively turn it on.
 
@@ -258,17 +293,17 @@ Haiku 4.5 is ~3× cheaper than Sonnet on input and faster end-to-end. For tasks 
 
 **Anti-pattern:** routing code-chunk work to Haiku to save money. The Sonnet→Haiku cost savings are real but Haiku will silently miss subtleties — wrong null-handling, wrong import order, wrong test framework — that Sonnet catches. False economy. The Haiku tier earns its keep on tasks where the verification surface is *trivial* (schema check, string equality, lint pass), not "looks like working code".
 
-**If Fable 5 is unavailable** (access lapsed, model retired, 400/404 on spawn): do not stall or downgrade silently. The replacement for an apex delegate is **ultrathink on Opus 4.8 + an independent Codex GPT-5.6 Sol `--effort high` pass on the same sub-problem**, reconciled by the orchestrator — depth via forced thinking budget, blind-spot coverage via cross-family diversity (and Sol is near-Fable depth on AA's index, 59 vs 60, so the substitute is credible). Note in the run log that the apex tier was substituted.
+**If Fable 5 is unavailable** (access lapsed, model retired, 400/404 on spawn): do not stall or downgrade silently. The replacement for an apex delegate is **ultrathink on Opus 5 + an independent Codex GPT-5.6 Sol `--effort high` pass on the same sub-problem**, reconciled by the orchestrator — depth via forced thinking budget, blind-spot coverage via cross-family diversity (and Sol is near-Fable depth on AA's index, 59 vs 60, so the substitute is credible). Note in the run log that the apex tier was substituted.
 
 ## 1M Context Routing — a fresh 1M session as a delegation target (never the orchestrator seat)
 
-**The rule, stated bluntly.** The orchestrator session stays **lean** — full stop. A 1M read surface is a *target*, not a *seat*. Opus 4.8 now ships a native 1M window at standard pricing, so the old *cost* argument ("the premium above 200K burns cash") is gone — but the rule stands on its other leg: the orchestrator's job (decompose, review diffs, reconcile reviews, talk to the user) is small-context work, and pouring 1M of source into the seat degrades reasoning quality and trashes the prompt cache regardless of price. Keep huge read surfaces in a **fresh** delegate session and the orchestrator stays sharp. If the orchestrator session itself is hitting 75%+ context, the right move is **handoff** (cheap, clean, deterministic), not bloating the seat.
+**The rule, stated bluntly.** The orchestrator session stays **lean** — full stop. A 1M read surface is a *target*, not a *seat*. Opus 5 ships a native 1M window at standard pricing, so the old *cost* argument ("the premium above 200K burns cash") is gone — but the rule stands on its other leg: the orchestrator's job (decompose, review diffs, reconcile reviews, talk to the user) is small-context work, and pouring 1M of source into the seat degrades reasoning quality and trashes the prompt cache regardless of price. Keep huge read surfaces in a **fresh** delegate session and the orchestrator stays sharp. If the orchestrator session itself is hitting 75%+ context, the right move is **handoff** (cheap, clean, deterministic), not bloating the seat.
 
 **When 1M Opus is the right routing call:**
 
 | Trigger | Why 1M, not Sonnet/Haiku subagent or Agent Teams |
 |---------|--------------------------------------------------|
-| Chunk needs to read >150K tokens of source material in one pass (monorepo-wide refactor analysis, big PDF/transcript ingest, multi-hundred-file audit, days of logs) | Subagent context is bounded by the orchestrator's allowance; Sonnet 4.6 caps below where this needs to be. 1M Opus gives the chunk a fresh full 1M window. |
+| Chunk needs to read >150K tokens of source material in one pass (monorepo-wide refactor analysis, big PDF/transcript ingest, multi-hundred-file audit, days of logs) | Subagent context is bounded by the orchestrator's allowance; Sonnet 5 caps below where this needs to be. 1M Opus gives the chunk a fresh full 1M window. |
 | Adversarial review where reviewer needs spec + full codebase + test suite + prior reviews in one context | Same as above — review quality collapses when the reviewer can't hold the whole surface. |
 | Cross-cutting "find every place X is true" sweep over a large corpus | Greps miss semantic patterns; full-context Opus reads catch them. |
 
@@ -279,7 +314,7 @@ Haiku 4.5 is ~3× cheaper than Sonnet on input and faster end-to-end. For tasks 
 - You only need keyword/symbol lookup → Haiku Explore subagent + grep.
 - The orchestrator session is full → handoff, not 1M flip.
 
-**Mechanical invocation.** The Agent tool's `model` parameter accepts `opus|sonnet|haiku|fable` — so a Fable *delegate* spawns natively, but a **1M context window** does not: subagent context is bounded by the orchestrator's allowance, well below 1M, whatever the model. For a genuine >150K read surface, route via **Bash subprocess** to the Claude Code CLI — Opus 4.8's native 1M window means a plain `--model claude-opus-4-8` subprocess holds the full 1M, no special variant string:
+**Mechanical invocation.** The Agent tool's `model` parameter accepts `opus|sonnet|haiku|fable` — so a Fable *delegate* spawns natively, but a **1M context window** does not: subagent context is bounded by the orchestrator's allowance, well below 1M, whatever the model. For a genuine >150K read surface, route via **Bash subprocess** to the Claude Code CLI — Opus 5's native 1M window means a plain `--model claude-opus-5` subprocess holds the full 1M, no special variant string:
 
 ```bash
 claude -p "$(cat <<'EOF'
@@ -296,7 +331,7 @@ Verification: <command to run on completion>
 Report: final file list + verification result.
 EOF
 )" \
-  --model 'claude-opus-4-8' \
+  --model 'claude-opus-5' \
   --permission-mode plan \
   --add-dir /path/to/your/project
 ```
@@ -309,7 +344,7 @@ EOF
 - Spawn latency is ~2-4s (process boot + cache warm). Acceptable for a chunk that will run for minutes; not acceptable for fan-out of 10 narrow tasks.
 - Set the runner in the manifest as `opus-1m-cli` (now wired into `delegate.sh validate` + `references/manifest-schema.md`). The spawn pattern is the subprocess block shown above.
 
-**Session escalation (last-resort, rare).** If the user's *own* session has accumulated irreducible context that handoff would lose (mid-debugging an ambiguous failure, holding cross-file mental state that can't be summarised cleanly), the alternative to handoff is launching a fresh 1M Opus 4.8 CLI session and pasting the held context in. State the trade-off out loud: "The orchestrator's at 80%. Handoff loses momentum but keeps the seat lean. A 1M flip preserves momentum, but every subsequent turn re-reads the bloated context — slower, costlier per turn, and the reasoning dulls. Recommendation: handoff unless the held state is genuinely unsummarisable." Default to handoff; the 1M flip needs an explicit yes.
+**Session escalation (last-resort, rare).** If the user's *own* session has accumulated irreducible context that handoff would lose (mid-debugging an ambiguous failure, holding cross-file mental state that can't be summarised cleanly), the alternative to handoff is launching a fresh 1M Opus 5 CLI session and pasting the held context in. State the trade-off out loud: "The orchestrator's at 80%. Handoff loses momentum but keeps the seat lean. A 1M flip preserves momentum, but every subsequent turn re-reads the bloated context — slower, costlier per turn, and the reasoning dulls. Recommendation: handoff unless the held state is genuinely unsummarisable." Default to handoff; the 1M flip needs an explicit yes.
 
 ## Usage
 
@@ -545,7 +580,7 @@ If anything fails: show the failure, show the offending chunk's `diff` (`delegat
 
 ### Step 10.5 — Dual-model QA review (major runs)
 
-Mechanical QA (Step 10) verifies that tests pass. It does not verify that the code is **good** — correct, idiomatic, safe, free of subtle bugs, complete. For major runs, a second pass is mandatory: **Opus 4.8 reviews in the main session, Codex GPT-5.6 Sol reviews in a fresh background context, both in parallel, then the orchestrator reconciles and fixes.**
+Mechanical QA (Step 10) verifies that tests pass. It does not verify that the code is **good** — correct, idiomatic, safe, free of subtle bugs, complete. For major runs, a second pass is mandatory: **Opus 5 reviews in the main session, Codex GPT-5.6 Sol reviews in a fresh background context, both in parallel, then the orchestrator reconciles and fixes.**
 
 #### When this step fires (the "major" trigger)
 
@@ -678,11 +713,11 @@ Set `DELEGATE_DEBUG=1` to enable an ERR trap that prints the failing line + comm
 
 | Subprocess CLI gains | Subprocess CLI costs |
 |----------------------|---------------------|
-| Full 1M-token context window per chunk (with `--model claude-opus-4-8`, native 1M) | Process spawn latency (~2-4s per launch) |
+| Full 1M-token context window per chunk (with `--model claude-opus-5`, native 1M) | Process spawn latency (~2-4s per launch) |
 | Independent hooks / MCP / settings | No streaming back to orchestrator (must scrape stdout) |
 | True session isolation | No `task-notification` token telemetry; harder to capture |
 | Survives orchestrator session limits | Permission prompts unless `--permission-mode plan` or pre-approved |
-| — | 1M is native to Opus 4.8 at standard pricing — no premium; the cost to avoid in the seat is per-turn token bloat + cache decay, not $/MTok |
+| — | 1M is native to Opus 5 at standard pricing — no premium; the cost to avoid in the seat is per-turn token bloat + cache decay, not $/MTok |
 
 Reach for CLI subprocess only when: (a) the chunk genuinely needs the 1M context window the subagent can't give it (route to 1M Opus per the dedicated section), (b) the chunk needs project-scoped MCP/hooks the orchestrator's session doesn't have, or (c) Agent Teams isn't enabled and you need true session isolation. For everything else, in-session subagents (Sonnet/Haiku) are the right tool. Don't subprocess-spawn out of habit — it's an escape hatch, not a default.
 
@@ -706,13 +741,10 @@ Reach for CLI subprocess only when: (a) the chunk genuinely needs the 1M context
 - Do NOT flip to 1M Opus instead of handoff — at 75%+ context, handoff is cheaper and cleaner. A 1M flip is a last-resort needing the user's explicit yes.
 - Do NOT route to 1M Opus when decomposition would solve it — splitting into Sonnet-sized sub-units wins on cost, latency, parallelism, and cache. 1M is for irreducible read surfaces only.
 - Do NOT seat the orchestrator on Fable 5 by default — the seat pays its 2× premium on every coordination turn. Fable is a *target* for the single hardest sub-problem; the seat-exception needs the user's explicit yes.
-- Do NOT reach for Fable as a "just in case" upgrade — at 2× cost its edge only shows where Opus 4.8 has visibly plateaued. Otherwise it's wasted spend.
+- Do NOT reach for Fable as a "just in case" upgrade — at 2× cost its edge only shows where Opus 5 has visibly plateaued on stamina or hardest-repo judgment. Since Opus 5 (2026-07-24), Fable scores *below* the seat on general intelligence, so a reflex escalation buys a weaker model at double the price. Name the lane or stay on Opus 5.
+- Do NOT route new work to Opus 4.8. Opus 5 supersedes it at identical pricing with a better score on every published benchmark.
 - Do NOT treat Fable as "model diversity" in QA — it's still a Claude model (depth, not diversity). Codex remains the cross-family reviewer; Fable breaks a tie.
 - Do NOT default Fable to `xhigh`/`max` — start at `high`, climb only on a concrete signal. Reflexive `max` on a 2× model is the priciest way to waste tokens here.
 - Do NOT accept a Codex Sol chunk's self-reported "tests pass" — METR measured GPT-5.6 Sol with the highest reward-hacking rate of any public model they've assessed. The orchestrator's own Step 10 QA run is the only evidence that counts.
 - Do NOT route Codex work to Terra or Luna — Terra measurably regresses on adversarial review and bloats long-horizon token spend; Luna duplicates Haiku's lane. Sol is the only 5.6 tier this skill calls.
-- Do NOT use Codex `ultra` effort inside a delegate run — it spawns Codex's own subagent fan-out and double-orchestrates against the manifest contract.
-
-## Sync homes
-
-Canonical: ~/.claude/skills/intelligent-delegation (private, live). Public sanitized twin: ~/code/skills/intelligent-delegation → github.com/justinwilliames/skills. Sanitization is a sync step — never push private paths/names.
+- Do NOT use Codex `ultra` inside a delegate run — it is not a reasoning tier at all (the API effort enum is `none`/`minimal`/`low`/`medium`/`high`/`xhigh`/`max`); it is a CLI-level switch that spawns Codex's own subagent fan-out and double-orchestrates against the manifest contract.
