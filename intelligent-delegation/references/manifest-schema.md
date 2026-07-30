@@ -23,16 +23,17 @@ There is no `integration_branch`. The skill is git-free; integration happens via
 | `title` | string | yes | Short operator-friendly label. |
 | `intent` | string | yes | The outcome the chunk must achieve. Not just a restatement of `title`. |
 | `files_touched` | string[] | yes | **Non-empty.** Relative paths from project root. Used for: collision validation, audit (chunk must not produce undeclared files), preflight (target files must not pre-exist). |
-| `runner` | enum | yes | One of `sonnet-subagent` \| `haiku-subagent` \| `codex` \| `fable-subagent` \| `opus-1m-cli` \| `main`. |
+| `runner` | enum | yes | One of `sonnet-subagent` \| `haiku-subagent` \| `opus-subagent` \| `codex` \| `fable-subagent` \| `opus-1m-cli` \| `main`. |
 | `depends_on` | string[] | no | Chunk IDs that must complete before this one starts. Default `[]`. |
 | `verification` | string | no | Shell command, runs in project root after `apply`. Skipped if absent. |
 
 ### Runner semantics
 
 - `sonnet-subagent` — orchestrator launches a Sonnet `Agent(...)` with the chunk prompt and absolute workspace path. Runs in background; orchestrator collects via `TaskOutput`.
+- `opus-subagent` — same `Agent(...)` shape with `model="opus"`. **The high-quality default for code chunks:** best build quality per chunk. Use `sonnet-subagent` instead for wide fan-outs of tightly-specified, easily-verified chunks, where wall-clock and cost matter more than per-chunk depth.
 - `haiku-subagent` — same `Agent(...)` shape with `model="haiku"`. Narrow text/data work only (classify, tag, format-convert, bulk mechanical edits) where verification is trivial. See SKILL.md → "When to Use Haiku vs Sonnet".
 - `codex` — orchestrator runs `codex.sh run ... --dir <workspace> --sandbox workspace-write`. Background.
-- `fable-subagent` — `Agent(...)` shape with `model="fable"`. **Apex reasoning target, not a default worker.** Reserve for the single hardest sub-problem in a run: research-grade decomposition, the subtlest algorithmic correctness, a blocker-conflict tie-break. 2× Opus cost — escalate only when Opus 4.8 has plateaued. See SKILL.md → "Fable 5 routing".
+- `fable-subagent` — `Agent(...)` shape with `model="fable"`. **Apex reasoning target, not a default worker, and not a general upgrade over the Opus 5 seat.** Reserve for Fable's two surviving evidenced lanes: multi-day-autonomy stamina, and SWE-bench-Pro-shaped repo judgment (plus a blocker-conflict tie-break at Step 10.5). Research-grade decomposition and subtlest-algorithmic-correctness are **no longer Fable lanes** — they moved back to the Opus 5 seat with ultrathink. Name the lane or don't spawn it. See SKILL.md → "Fable 5 routing".
 - `opus-1m-cli` — Bash subprocess to the Claude Code CLI for a chunk whose *read surface* exceeds ~150K tokens (native 1M window, fresh session). Not the orchestrator seat. See SKILL.md → "1M Context Routing".
 - `main` — orchestrator implements this chunk itself in-session (after fan-out returns, or before, depending on `depends_on`). Reserve for chunks that genuinely need orchestrator context.
 

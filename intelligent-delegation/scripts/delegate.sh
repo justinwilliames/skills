@@ -63,6 +63,12 @@ Lifecycle:
                                           before authoring the manifest.
   summary <run-id>                        Print a compact run summary.
   watch [run-id]                          Compact one-shot snapshot of state.tsv with counts.
+  liveness [run-id] [--stale-secs N]      Liveness check on every `running` chunk:
+           [--grace-secs N]               spawn stamp (<chunk>/.spawned) + newest
+                                          artifact mtime anywhere under <chunk>/.
+                                          Verdicts: ALIVE | BOOTING | SILENT | STALLED.
+                                          Exit 2 if any SILENT/STALLED; exit 3 if the
+                                          run is unusable (ABORTED, or empty state.tsv).
   handoff <run-id>                        Generate a paste-ready context-transfer
                                           prompt for starting a fresh session.
   pending <run-id>                        Print chunk ids still pending/failed.
@@ -234,7 +240,7 @@ cmd_validate() {
           if ($c|type) != "object" then "chunk[\($i)] must be an object"
           else
             ((["id","title","intent","runner","files_touched"] - ($c|keys_unsorted))[]? | "chunk[\($i)] missing key: \(.)"),
-            (if ($c|has("runner")) and ([ "sonnet-subagent","haiku-subagent","codex","fable-subagent","opus-1m-cli","main" ] | index($c.runner) | not)
+            (if ($c|has("runner")) and ([ "sonnet-subagent","haiku-subagent","opus-subagent","codex","fable-subagent","opus-1m-cli","main" ] | index($c.runner) | not)
               then "chunk[\($i)] invalid runner: \($c.runner)" else empty end),
             (if ($c|has("files_touched")) and ($c.files_touched|type != "array")
               then "chunk[\($i)] files_touched must be an array" else empty end),
@@ -360,6 +366,15 @@ cmd_set() {
     END { if (!found) exit 2 }
   ' "$state" >"${state}.tmp" || { rm -f "${state}.tmp"; print_error "chunk not in state: $chunk_id"; exit 1; }
   mv "${state}.tmp" "$state"
+
+  # Stamp the spawn time when a chunk goes `running`. This is the liveness
+  # gate's second signal — without it there is no way to tell "spawned two
+  # seconds ago and still booting" from "hung twenty minutes ago", and the
+  # gate false-alarms on every healthy fan-out.
+  if [[ $updates_status == "running" ]]; then
+    mkdir -p "$(run_dir "$run_id")/$chunk_id"
+    : > "$(run_dir "$run_id")/$chunk_id/.spawned"
+  fi
 }
 
 cmd_get() {
@@ -627,6 +642,125 @@ cmd_watch() {
   grep -v '^#' "$state" | column -t -s $'\t'
 }
 
+# ── liveness ────────────────────────────────────────────────────────────────
+# Liveness check for `running` chunks. A backgrounded agent can hang silently
+# and never emit a completion event — "no notification" means UNKNOWN, not
+# alive. Two signals, both of which actually exist on disk:
+#   1. spawn stamp  — <chunk-id>/.spawned, written by `set status=running`
+#   2. artifact age — newest mtime of ANY file under <chunk-id>/ (the workspace,
+#                     codex.jsonl, result.txt — whatever the runner emits)
+#
+# Verdicts:
+#   ALIVE    — an artifact moved inside the stale window
+#   BOOTING  — no artifacts yet, but spawned less than --grace-secs ago (normal)
+#   SILENT   — no artifacts and past the grace window
+#   STALLED  — has artifacts, none of them moved inside the stale window
+# Exit codes: 0 all ALIVE/BOOTING · 2 any SILENT/STALLED · 3 run is unusable
+# (ABORTED marker present, or state.tsv missing/empty) — never report OK over
+# a corpse.
+
+_mtime() {
+  # portable mtime in epoch seconds; prints 0 when the path is missing
+  [[ -e $1 ]] || { printf '0\n'; return; }
+  if stat -f %m "$1" 2>/dev/null; then return; fi
+  stat -c %Y "$1" 2>/dev/null || printf '0\n'
+}
+
+_newest_mtime() {
+  # newest mtime of any regular file under a directory, EXCLUDING the .spawned
+  # stamp (which would otherwise read as a fresh artifact forever); 0 if none.
+  local dir=$1 newest=0 m
+  [[ -d $dir ]] || { printf '0\n'; return; }
+  while IFS= read -r f; do
+    [[ $(basename "$f") == ".spawned" ]] && continue
+    m=$(_mtime "$f")
+    if (( m > newest )); then newest=$m; fi
+  done < <(find "$dir" -type f 2>/dev/null || true)
+  printf '%s\n' "$newest"
+}
+
+cmd_liveness() {
+  local run_id="" stale=${DELEGATE_STALE_SECS:-300} grace=${DELEGATE_GRACE_SECS:-90}
+  while [[ $# -gt 0 ]]; do
+    case "$1" in
+      --stale-secs) stale=$2; shift 2 ;;
+      --grace-secs) grace=$2; shift 2 ;;
+      -*) print_error "unknown flag: $1"; exit 1 ;;
+      *) run_id=$1; shift ;;
+    esac
+  done
+  [[ $stale =~ ^[0-9]+$ ]] || { print_error "--stale-secs must be an integer number of seconds: $stale"; exit 1; }
+  [[ $grace =~ ^[0-9]+$ ]] || { print_error "--grace-secs must be an integer number of seconds: $grace"; exit 1; }
+  if [[ -z $run_id ]]; then
+    [[ -f $LAST_FILE ]] || { print_error "no run-id and no LAST run"; exit 1; }
+    run_id=$(cat "$LAST_FILE")
+  fi
+  ensure_run "$run_id"
+  local state; state=$(state_of "$run_id")
+  local rdir; rdir=$(run_dir "$run_id")
+  local now; now=$(date +%s)
+  local bad=0 running_n=0
+
+  printf 'LIVENESS run_id=%s stale_secs=%s grace_secs=%s\n' "$run_id" "$stale" "$grace"
+
+  # A run that has been aborted, or whose state file is gone or empty, cannot
+  # be reported healthy — that is the fail-open the gate exists to prevent.
+  if [[ -f "$rdir/ABORTED" ]]; then
+    printf 'LIVENESS_UNUSABLE: ABORTED marker present — this run cannot be applied. Clean + re-init, or resume after fixing the root cause.\n'
+    return 3
+  fi
+  if [[ ! -s $state ]]; then
+    printf 'LIVENESS_UNUSABLE: state.tsv missing or empty for %s — the run has lost its source of truth.\n' "$run_id"
+    return 3
+  fi
+
+  printf 'chunk\tverdict\tartifact_age_s\tspawn_age_s\tfiles\n'
+
+  while IFS=$'\t' read -r id status _rest; do
+    if [[ -z $id || $id == \#* || $id == "id" ]]; then continue; fi
+    if [[ $status != "running" ]]; then continue; fi
+    running_n=$((running_n + 1))
+
+    local cdir="$rdir/$id"
+    local art_m spawn_m nfiles art_age spawn_age verdict
+    art_m=$(_newest_mtime "$cdir")
+    spawn_m=$(_mtime "$cdir/.spawned")
+    nfiles=$(find "$cdir" -type f ! -name .spawned 2>/dev/null | wc -l | tr -d ' ' || true)
+    [[ -n $nfiles ]] || nfiles=0
+
+    if (( art_m == 0 )); then art_age=-1; else art_age=$(( now - art_m )); fi
+    if (( spawn_m == 0 )); then spawn_age=-1; else spawn_age=$(( now - spawn_m )); fi
+
+    # Guard against clock skew / a future-dated mtime reading as ancient.
+    if (( art_age < 0 && art_m != 0 )); then art_age=0; fi
+
+    if (( art_m == 0 )); then
+      # No artifacts at all. Booting is normal for the first ~90s; a chunk with
+      # no spawn stamp predates this feature, so give it the benefit of grace.
+      if (( spawn_age >= 0 && spawn_age < grace )); then verdict=BOOTING; else verdict=SILENT; fi
+    elif (( art_age < stale )); then
+      verdict=ALIVE
+    else
+      verdict=STALLED
+    fi
+    if [[ $verdict == "SILENT" || $verdict == "STALLED" ]]; then bad=$((bad + 1)); fi
+
+    printf '%s\t%s\t%s\t%s\t%s\n' "$id" "$verdict" "$art_age" "$spawn_age" "$nfiles"
+  done < "$state"
+
+  if (( running_n == 0 )); then
+    printf 'LIVENESS_OK: no running chunks\n'
+    return 0
+  fi
+  if (( bad > 0 )); then
+    printf 'LIVENESS_FAIL: %d/%d running chunks not advancing — investigate before collecting.\n' "$bad" "$running_n"
+    printf '  STALLED: re-spawn ONCE into a clean workspace (delegate.sh prepare re-creates it), or abort.\n'
+    printf '  SILENT : past the grace window with nothing on disk — treat as stalled.\n'
+    return 2
+  fi
+  printf 'LIVENESS_OK: %d/%d running chunks advancing or booting\n' "$running_n" "$running_n"
+}
+
 # ── handoff ──────────────────────────────────────────────────────────────────
 # Generates a paste-ready context-transfer prompt for starting a fresh session.
 # Reads manifest + state.tsv and emits a self-contained brief the new orchestrator
@@ -740,11 +874,15 @@ cmd_abort() {
   # collect running chunk ids first so cmd_set's awk pipeline doesn't compete for stdin
   local running_ids
   running_ids=$(awk -F'\t' '!/^#/ && $1 != "id" && $2 == "running" { print $1 }' "$state")
+  # read line-by-line, not word-splitting — a chunk id may contain spaces, and
+  # unquoted expansion here aborted the run only partially while still leaving
+  # the ABORTED marker in place (found in team review, 2026-07-30)
   local cid
-  for cid in $running_ids; do
+  while IFS= read -r cid; do
+    [[ -n $cid ]] || continue
     cmd_set "$run_id" "$cid" "status=failed" "result=aborted:$reason"
     count=$((count+1))
-  done
+  done <<< "$running_ids"
   printf 'ABORTED: %d chunks (reason=%s, marker=%s)\n' "$count" "$reason" "$marker"
 }
 
@@ -783,6 +921,7 @@ main() {
     autodetect)      cmd_autodetect "$@" ;;
     summary)         cmd_summary "$@" ;;
     watch)           cmd_watch "$@" ;;
+    liveness)        cmd_liveness "$@" ;;
     handoff)         cmd_handoff "$@" ;;
     abort)           cmd_abort "$@" ;;
     clean)           cmd_clean "$@" ;;

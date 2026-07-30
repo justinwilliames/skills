@@ -210,3 +210,79 @@ If a chunk reports failure or its verification fails:
 2. Orchestrator does NOT auto-retry *hard* failures. (Transient failures — `timeout`/`429`/`ECONNRESET`/`503` — get exactly one silent retry; see the transient-vs-hard policy in `orchestration-patterns.md`.)
 3. Surface to the user: chunk id, intent, error, suggested fix.
 4. If the user approves, re-run via `/delegate resume <run-id>` after fixing the chunk's source state.
+
+## Session-handoff transfer prompt
+
+> Moved here from SKILL.md 2026-07-30 (R10 economy pass). Reason: it is a ~55-line template in a file that loads on every session, and `delegate.sh handoff` already generates it from the manifest — the always-loaded file should carry the *trigger*, not the boilerplate. (Its `##` lines are inside a code fence and never were real headings; an earlier note here claimed otherwise and was wrong.) SKILL.md carries the triggers and the rule; this is the shape.
+
+For a run in flight, `delegate.sh handoff <run-id>` generates this automatically from the manifest + `state.tsv`. Author it by hand only when there is no delegate run to read from.
+
+~~~
+```
+Pick up where the last session left off. Here's the full context:
+
+## What was done
+<bullet list — shipped features, confirmed facts, dead ends proven>
+
+## Current state
+<what exists now, what version shipped, what's live>
+
+## Next action
+<single concrete first step — tool call, command, or decision>
+
+## Open unknowns
+<what hasn't been verified yet, what could break>
+
+## Key files
+<file path — what's relevant about it>
+<file path — what's relevant about it>
+
+## Dead ends — do not retry
+<approach — why it fails>
+```
+~~~
+
+If a delegate run is in progress, append:
+
+```
+## Delegate run
+run_id: <run-id>
+project: <path>
+pending chunks: <ids>
+next step: /delegate resume <run-id>
+```
+
+Keep it tight enough to paste without hesitation.
+
+## `opus-1m-cli` — the 1M subprocess spawn block
+
+> Moved here from SKILL.md 2026-07-30 (R10 economy pass). SKILL.md carries the routing rule; this is the invocation.
+
+The Agent tool's `model` param accepts `opus|sonnet|haiku|fable`, so a Fable *delegate* spawns natively — but a **1M context window** does not: subagent context is bounded by the orchestrator's allowance, well below 1M, whatever the model. For a genuine >150K read surface, route via a Bash subprocess to the Claude Code CLI. Opus 5's native 1M window means a plain `--model claude-opus-5` holds the full window — no special variant string.
+
+```bash
+claude -p "$(cat <<'EOF'
+You are a 1M-context delegated chunk. Read surface: ~280K tokens across the listed files.
+
+PROJECT (read-only): /path/to/project
+WORKSPACE (write here, relative paths): /tmp/delegate/<run-id>/chunk-2/workspace
+
+Task: <intent>
+Files to load: <explicit list, OR a glob>
+Deliverables: <files to write>
+Verification: <command to run on completion>
+
+Report: final file list + verification result.
+EOF
+)" \
+  --model 'claude-opus-5' \
+  --permission-mode plan \
+  --add-dir /path/to/project
+```
+
+- `--permission-mode plan` stops the chunk prompting for tool approvals; pre-approve via project settings if it needs to write.
+- `--add-dir` grants read access to the project. The workspace stays at `$RUN_DIR/<chunk-id>/workspace` per the standard contract.
+- No `task-notification` token telemetry from a CLI subprocess — scrape the final stdout line, or parse `--output-format json` if you need exact counts in `state.tsv`.
+- Spawn latency ~2–4s (process boot + cache warm). Fine for a chunk running for minutes; wrong for a fan-out of 10 narrow tasks.
+- Manifest runner is `opus-1m-cli` (wired into `delegate.sh validate` + `manifest-schema.md`).
+- Build the prompt body on your standard briefing spine, same as any other spawn.

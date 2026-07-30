@@ -11,14 +11,14 @@
 Paste this into a Claude Code session and let Claude do the install:
 
 ```
-Install the intelligent-delegation skill: clone https://github.com/justinwilliames/claude-codex-intelligent-delegation-skill into ~/.claude/skills/intelligent-delegation, then verify by listing ~/.claude/skills/intelligent-delegation/SKILL.md. The Codex wrapper is bundled — no separate install needed. Confirm jq is on PATH; if not, install it via brew install jq.
+Install the intelligent-delegation skill: clone https://github.com/justinwilliames/skills, copy its intelligent-delegation/ directory to ~/.claude/skills/intelligent-delegation, then verify by listing ~/.claude/skills/intelligent-delegation/SKILL.md. The Codex wrapper is bundled — no separate install needed. Confirm jq is on PATH; if not, install it via brew install jq.
 ```
 
 Or in a terminal:
 
 ```bash
-git clone https://github.com/justinwilliames/claude-codex-intelligent-delegation-skill \
-  ~/.claude/skills/intelligent-delegation
+git clone https://github.com/justinwilliames/skills /tmp/claude-skills
+cp -R /tmp/claude-skills/intelligent-delegation ~/.claude/skills/intelligent-delegation
 
 # dependency
 brew install jq   # or: apt install jq
@@ -40,8 +40,8 @@ The skill is designed to fire **at the start of every non-trivial task**, before
 2. **Context** — would in-session execution burn >30% of remaining context?
 3. **Fresh-window** — would a single deep task benefit from a fresh prompt cache + clean reasoning surface?
 4. **Parallelism** — are there 2+ independent units that could run concurrently?
-5. **Large surface** — does the chunk's read surface exceed ~150K tokens? If so, route it to a 1M Opus 4.8 subprocess (never the orchestrator seat).
-6. **Model fit** (only if 1–5 are all no) — does the task genuinely need Opus reasoning? If not, route to a 1-chunk Sonnet or Codex run for efficiency. If it's *harder* than Opus 4.8 (research-grade decomposition, subtlest correctness), escalate that sub-problem to a Fable 5 delegate — a target, never the orchestrator seat.
+5. **Large surface** — does the chunk's read surface exceed ~150K tokens? If so, route it to a 1M Opus 5 subprocess (never the orchestrator seat).
+6. **Model fit** (only if 1–5 are all no) — does the task genuinely need Opus-level reasoning? If not, route to a 1-chunk Sonnet or Codex run for efficiency. If it sits in one of Fable 5's two narrow lanes (multi-day-autonomy stamina, hardest-repo judgment) *and* Opus 5 has visibly plateaued, escalate that sub-problem to a Fable delegate — a target, never the orchestrator seat. Since Opus 5, that escalation is a lateral trade, not an upgrade.
 
 If any of 1–4 is yes, delegate. Even a 1-chunk run is worth it for fresh-window value alone — parallelism is one optimisation; fresh-context and model-fit are equally valid reasons to delegate. The Q6 check stops the main session burning Opus on mechanical work (renames, boilerplate, pattern-mirroring, lint/format fixes) that Sonnet handles better and cheaper.
 
@@ -63,7 +63,7 @@ The Codex wrapper is bundled under [`codex/`](codex/) — vendored from [tomc98/
 ## Updating
 
 ```bash
-cd ~/.claude/skills/intelligent-delegation && git pull
+cd /tmp/claude-skills && git pull && cp -R intelligent-delegation ~/.claude/skills/
 ```
 
 ## Usage
@@ -87,29 +87,33 @@ Claude Code loads the skill automatically when you ask it to delegate or decompo
 3. **Validate + preflight** — schema check, file-collision check across chunks, and a guard against overwriting existing project files.
 4. **Confirm** — manifest shown; you approve.
 5. **Prepare workspaces** — each chunk gets a private `<chunk-id>/workspace/` directory to write into.
-6. **Fan out** — Sonnet subagents and Codex run in parallel, each constrained to their own workspace.
-7. **Audit** — verifies each chunk only produced its declared files and no two chunks emitted the same file.
-8. **Apply** — copies workspace outputs into the project, preserving relative paths.
-9. **QA gate** — per-chunk verification + project-wide test suite, run against the integrated project.
-10. **Present** — table of chunks, files, tokens, durations, pass/fail. Plus the `run_id` for resume.
+6. **Fan out** — subagents and Codex run in parallel, each constrained to their own workspace, each briefed on one standard spine rather than ad-hoc prompts.
+7. **Liveness gate** — `delegate.sh liveness` checks two signals per running chunk (its spawn stamp, and the newest artifact mtime anywhere under the chunk dir) and reports `ALIVE` / `BOOTING` / `SILENT` / `STALLED`. A missing completion notification is not evidence of progress; no chunk is reported as "running" without this observation. Fails closed — exit 3 rather than OK when the run has been aborted or lost its state file.
+8. **Audit** — verifies each chunk only produced its declared files and no two chunks emitted the same file.
+9. **Apply** — copies workspace outputs into the project, preserving relative paths.
+10. **QA gate** — per-chunk verification + project-wide test suite, run against the integrated project.
+11. **Dual-model review** (major runs) — a cold Opus 5 subagent and Codex Sol review the applied code independently and in parallel; the orchestrator reconciles into one punch list.
+12. **Present** — table of chunks, files, tokens, durations, pass/fail. Plus the `run_id` for resume.
 
 Audit and QA failures are always surfaced to you — never auto-resolved.
 
 ## Model routing
 
+Every figure behind these calls lives in one dated block in `SKILL.md` → **Model Facts**; nothing else in the skill restates a number.
+
 | Tier | Model | Used for |
 |------|-------|---------|
-| Orchestrator | Opus 4.8 (main session) | Planning, reviewing, QA, reporting |
-| Apex reasoning | Fable 5 (delegate target) | The single hardest sub-problem when Opus 4.8 plateaus — never the orchestrator seat |
-| Planning | Opus 4.8 (Plan subagent) | Manifest authoring for non-trivial decompositions |
-| Build | Sonnet 4.6 (Agent) | Parallel implementation chunks |
-| Cheap parallel | Haiku 4.5 (Agent) | High-volume narrow text/data chunks (classify, convert, bulk edits) |
-| Large-context | Opus 4.8 1M (CLI subprocess) | A single chunk with a >150K read surface — never the seat |
-| Integration | Opus 4.8 (main, in-line) | `runner: main` chunks — glue, cross-cutting edits |
+| Orchestrator | Opus 5 (main session) | Planning, reviewing, QA, reporting |
+| Apex reasoning | Fable 5 (delegate target) | Fable's two surviving lanes — multi-day-autonomy stamina, hardest-repo judgment — never the orchestrator seat |
+| Planning | Opus 5 (Plan subagent) | Manifest authoring for non-trivial decompositions |
+| Build | Opus 5 (Agent) — Sonnet 5 for wide fan-outs | Parallel implementation chunks |
+| Cheap parallel | Haiku 4.5 (Agent) | High-volume narrow text/data chunks (classify, convert, bulk edits) — a volume-and-latency play, never a cost one |
+| Large-context | Opus 5 1M (CLI subprocess) | A single chunk with a >150K read surface — never the seat |
+| Integration | Opus 5 (main, in-line) | `runner: main` chunks — glue, cross-cutting edits |
 | Precision | Codex GPT-5.6 Sol | Deep work, adversarial review, second opinions |
 | Lookup | Haiku 4.5 (Explore subagent) | File search, symbol lookup |
 
-Full decision tree: [`references/routing.md`](references/routing.md)
+Full decision tree and the seat-topology argument: [`references/routing.md`](references/routing.md)
 
 ## State model
 
@@ -132,7 +136,7 @@ $TMPDIR/delegate/<run-id>/
 init / write-manifest / validate / preflight / prepare /
 set / get / state / workspace / pending / resume /
 diff / audit / apply / qa / summary / handoff / watch /
-abort / clean / last / autodetect / codex
+liveness / abort / clean / last / autodetect / codex
 ```
 
 `DELEGATE_DEBUG=1` enables an ERR trap that prints failing line + command + exit code.

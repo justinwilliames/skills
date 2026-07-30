@@ -76,10 +76,12 @@ Do NOT idle. The prompt cache TTL is 5 minutes. Letting the main session sit sil
 
 The orchestrator should call `{base}/scripts/delegate.sh abort <run-id>` when it detects a runaway chunk. Triggers:
 
-- **Stale output.** `output.log` has not changed for 5+ minutes.
+- **Confirmed stall.** `delegate.sh liveness <run-id>` returns `STALLED` for the same chunk twice, with a re-spawn in between. Never abort off a hunch — the liveness read is the evidence.
 - **Contradictory state.** The chunk reports `done` but its workspace is empty, or vice versa.
 - **Infinite loop in stdout.** Repeated phrases, ballooning output size, the chunk is clearly stuck.
 - **User signal.** The user says "stop", "abort", "kill the run".
+
+Do NOT abort off a single `SILENT` or `STALLED` reading. `BOOTING` is normal for the first 90 seconds, and a chunk that reasons for minutes before its first write is working, not hung — that false-alarm is exactly what the grace window exists to prevent.
 
 Behaviour: `abort` marks all `running` chunks `failed` with `result=aborted:<reason>`, writes an `ABORTED` marker file to the run dir, and prevents the `apply` step from running. Re-fan via `/delegate resume` after the root cause is identified and fixed.
 
@@ -132,3 +134,42 @@ The orchestrator on resume should:
 - **Auto-resolving conflicts.** The user decides. Always.
 - **Holding chunk diffs in your context.** Use `delegate.sh diff <run-id> <chunk-id>` on demand. State.tsv has everything else.
 - **Spawning a new orchestrator turn per chunk.** Fan out all parallelizable chunks in a single batch. Don't serialize what can be parallel.
+
+## Surface notes — Desktop, CLI, and Agent Teams
+
+> Moved here from SKILL.md 2026-07-30 (R10 economy pass). SKILL.md carries the routing rule; this is the detail behind it.
+
+**Desktop ↔ CLI parity (confirmed 2026).** Claude Code Desktop (Mac/Windows app) and the terminal CLI both support the Agent / `subagent_type` tool, `~/.claude/skills/`, hooks, MCP servers, and CLAUDE.md inheritance. This skill works identically on both — same triage, same fan-out, same QA gates. Documented Desktop gaps that touch this skill: no `--model` / `--permission-mode` flags exposed at launch, and no autonomous `/loop` runs. Neither blocks the core flow.
+
+**Agent Teams (experimental, shipped Feb 2026).** A lead agent coordinating independent teammate *instances* via shared task lists and mailbox-style inter-agent messaging. Enable with `CLAUDE_CODE_EXPERIMENTAL_AGENT_TEAMS=1`.
+
+**Default behaviour: stay on subagents.** The `opus-subagent` / `sonnet-subagent` / `haiku-subagent` runners cover ~95% of fan-out needs — faster to spawn, well-understood failure modes, no shared-mailbox footgun. Agent Teams is a real escape hatch, not a parallel-by-default mechanism. The bar is genuinely high.
+
+| Trigger | Why subagents fail here | First-choice answer |
+|---------|------------------------|---------------------|
+| A single chunk needs >150K context | Subagent context is bounded by the orchestrator's allowance | **1M Opus CLI subprocess** (`opus-1m-cli`). Agent Teams only if that isn't enough or you need teammate-shaped coordination. |
+| A chunk needs project-scoped MCP servers the orchestrator lacks | Subagents inherit orchestrator MCP config | Agent Teams or CLI subprocess — both isolate MCP config |
+| A chunk needs different hooks (security policy, auto-format, permission scope) | Subagents share hooks with the orchestrator | Agent Teams or CLI subprocess |
+| The chunk could outlast the orchestrator's session limit | Subagents die when the orchestrator session dies | Agent Teams (independent lifetime) |
+| The user explicitly asks for Agent Teams | Direct instruction overrides default | Agent Teams |
+
+State the call out loud when reaching for it, like every other delegation call:
+
+> `Agent Teams call: chunk-2 needs to ingest a 400k-token monorepo dump — beyond subagent context. Spinning up a teammate instance.`
+
+**Mailbox messaging is a footgun for this skill's contract.** Agent Teams lets chunks talk to each other. This skill's manifest contract is explicit: chunks are *independent* — no shared files, no cross-dependencies. If chunks need to coordinate, the decomposition is wrong; re-author the manifest rather than papering over it with mailbox traffic. Use the mailbox only for chunk-to-orchestrator status, never chunk-to-chunk.
+
+**No runner integration yet.** Agent Teams is documented but NOT wired into `delegate.sh` as a `runner:` enum value. When a real use case lands, the work is: (a) add `agent-team` to the runner enum in `references/manifest-schema.md` and `delegate.sh validate`, (b) add a spawn block to Step 6, (c) decide how `validate`/`audit`/`apply` handle teammate-produced workspaces. Don't speculate-build it before a real chunk needs it — speculative integration rots until first use exposes the wrong assumptions.
+
+**CLI subprocess trade-off** (`claude -p "<prompt>" --model <id>`). The Agent tool's `model` param exposes `opus|sonnet|haiku|fable`, so Fable delegates spawn natively — but it cannot give a subagent a fresh **1M context window**. A genuine >150K read surface is the case for a subprocess.
+
+| Gains | Costs |
+|-------|-------|
+| Full 1M-token context per chunk (`--model claude-opus-5`, native 1M) | Process spawn latency (~2–4s per launch) |
+| Independent hooks / MCP / settings | No streaming back to the orchestrator (scrape stdout) |
+| True session isolation | No `task-notification` token telemetry; harder to capture |
+| Survives orchestrator session limits | Permission prompts unless `--permission-mode plan` or pre-approved |
+
+Reach for a CLI subprocess only when: (a) the chunk genuinely needs the 1M window, (b) it needs project-scoped MCP/hooks the orchestrator's session lacks, or (c) Agent Teams isn't enabled and you need true session isolation. For everything else, in-session subagents are the right tool. Don't subprocess-spawn out of habit — it's an escape hatch, not a default.
+
+**Outcomes (research preview).** Claude Managed Agents supports "Outcomes" — specify a desired end state, the agent loops until achieved. A different shape from this skill's bounded decompose-fan-out-collect flow. Don't fold it into the core loop; it changes the determinism contract. Worth knowing for genuinely outcome-shaped specs ("get all tests passing", "reduce bundle below 200kb") rather than decomposable ones.
