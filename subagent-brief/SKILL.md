@@ -51,6 +51,15 @@ This template makes inheritance mechanical instead of remembered.
 6. OUTPUT     The deliverable shape: raw markdown data for the orchestrator (not a
               user-facing message), structure specified (per-item: edits, results, hashes,
               deviations). The final message IS the return value.
+              **EVIDENCE TAGS — every finding or claim opens [instrumented] or
+              [judgement].** [instrumented] = it RAN something; name the command and
+              quote the real output (a number, a status code, a pass/fail, a count, a
+              diff). [judgement] = taste, craft, feel, or a read of the situation —
+              entirely legitimate, and often the point. An [instrumented] tag with no
+              quoted output is a failed item and gets sent back. Both tags are
+              honourable; the tag exists because a confident report and a correct
+              report read identically, and the orchestrator has to weight them
+              differently.
 
 7. SANITIZE   (public-facing work only) No personal names/handles, no internal campaign names,
               no personal paths/PII, no private-memory refs. Grep gate named in VERIFY.
