@@ -26,14 +26,17 @@
     </div>
   </div>
 
-  <div class="edge">
+  <div class="edge edge--top">
     <div class="logo scrim scrim--tight" data-slot="logo"></div>
   </div>
 </div>
 
 <style>
-  /* Clear the logo bar so a long lede never runs into it. */
-  .stage__content--with-edge { padding-bottom: 20rem; }
+  /* The logo sits TOP-left, not bottom-left. Captions burn in along the bottom
+     of the frame by default, and a centred caption bar is wide enough to cover
+     bottom-left furniture — which it did, hiding the wordmark on the title card
+     of the first cut. Bottom edge stays clear; top edge is free. */
+  .stage__content--with-edge { padding-top: 16rem; }
 </style>
 
 <script>

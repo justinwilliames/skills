@@ -431,8 +431,16 @@ async function awaitDemoRuntime(frame, log) {
   return true;
 }
 
-async function shot(page, path) {
-  await page.screenshot({ path, animations: 'disabled', caret: 'hide', scale: 'device' });
+async function shot(page, path, { mask, maskColor = '#140934' } = {}) {
+  await page.screenshot({
+    path,
+    animations: 'disabled',
+    caret: 'hide',
+    scale: 'device',
+    // Painted at screenshot time, so a late re-render cannot expose what a
+    // DOM-level redaction had already replaced.
+    ...(mask?.length ? { mask, maskColor } : {}),
+  });
 }
 
 /**
@@ -501,7 +509,7 @@ function makeDriver({ page, demoFrame, hasRuntime, meta, viewport }) {
  *
  * Returns { frameCount, durationMs, resolvedTargets }.
  */
-async function recordFlow(page, { flow, meta, framesDir, driver, log, debug }) {
+async function recordFlow(page, { flow, meta, framesDir, driver, log, debug, mask }) {
   const surface = page.frameLocator('#pdv-frame');
   const plan = planFlow(flow, meta.fps);
   const resolvedTargets = {};
@@ -557,7 +565,7 @@ async function recordFlow(page, { flow, meta, framesDir, driver, log, debug }) {
         }, Number(step.value ?? 600) / frames);
       }
 
-      await shot(page, join(framesDir, `${pad6(frameIndex)}.png`));
+      await shot(page, join(framesDir, `${pad6(frameIndex)}.png`), { mask });
       frameIndex += 1;
     }
     if (step.action === 'highlight') await driver.clearHighlight();
@@ -871,7 +879,85 @@ async function captureStorybook({ browser, brand, tokens, meta, scene, sceneDir,
   }
 }
 
+/**
+ * PII treatment for live-product capture.
+ *
+ * Recording a real logged-in account puts real customer names, addresses, phone
+ * numbers and invoice totals into a file that is about to be published. There is
+ * no undo once a video ships, so this is DEFAULT-DENY: a `url` scene refuses to
+ * capture until someone has looked at the screen and declared what to hide.
+ *
+ * Three treatments, applied before any pixel is captured:
+ *   replace — swap the real string for a safe one. Best: the frame still reads
+ *             naturally, and nothing sensitive was ever rasterised.
+ *   blur    — CSS blur. Use for whole regions (a customer list) where replacing
+ *             every field is impractical.
+ *   mask    — solid boxes via Playwright's native mask. The bluntest and safest.
+ *
+ * Prefer a dedicated demo tenant over any of this. Masking is a net that catches
+ * what you thought of; a demo tenant has nothing to catch.
+ */
+export async function applyPiiTreatment(surface, page, pii, { log } = {}) {
+  if (!pii) return { maskLocators: [], applied: { replace: 0, blur: 0, mask: 0 } };
+
+  const applied = { replace: 0, blur: 0, mask: 0 };
+
+  for (const rule of pii.replace ?? []) {
+    if (!rule.selector) continue;
+    const n = await surface
+      .locator(rule.selector)
+      .evaluateAll((els, text) => {
+        els.forEach((el) => {
+          el.textContent = text;
+        });
+        return els.length;
+      }, rule.text ?? '—')
+      .catch(() => 0);
+    applied.replace += n;
+  }
+
+  if (pii.blur?.length) {
+    const css = `${pii.blur.join(', ')} { filter: blur(10px) !important; }`;
+    await surface.locator('body').evaluate((body, styleText) => {
+      const s = body.ownerDocument.createElement('style');
+      s.textContent = styleText;
+      body.ownerDocument.head.appendChild(s);
+    }, css).catch(() => {});
+    applied.blur = pii.blur.length;
+  }
+
+  // Playwright's mask paints over the element at screenshot time, so it cannot
+  // be defeated by a late re-render the way a DOM edit can.
+  const maskLocators = (pii.mask ?? []).map((sel) => surface.locator(sel));
+  applied.mask = maskLocators.length;
+
+  log?.(
+    `  pii: replaced ${applied.replace} node(s), blurred ${applied.blur} selector(s), masking ${applied.mask} selector(s)`,
+  );
+  return { maskLocators, applied };
+}
+
+/** Refuse to record a live product until someone has signed off what is on screen. */
+function assertPiiAcknowledged(scene) {
+  const pii = scene.capture.pii;
+  if (pii?.acknowledged === true) return pii;
+  throw new Error(
+    `scene "${scene.id}" captures a live URL but has no acknowledged PII declaration.\n\n` +
+      `  Recording a logged-in product puts real customer data into a published file.\n` +
+      `  Add to this scene's capture block:\n\n` +
+      `    "pii": {\n` +
+      `      "acknowledged": true,\n` +
+      `      "replace": [{ "selector": ".customer-name", "text": "Jordan Blake" }],\n` +
+      `      "blur":    [".invoice-total"],\n` +
+      `      "mask":    [".contact-list"]\n` +
+      `    }\n\n` +
+      `  Safer still: point --url at a demo tenant with seeded data, and there is\n` +
+      `  nothing to redact in the first place.`,
+  );
+}
+
 async function captureUrl({ browser, brand, tokens, meta, scene, sceneDir, fontCss, ctx }) {
+  const pii = assertPiiAcknowledged(scene);
   const auth = scene.capture.auth ?? {};
   const contextExtra = {};
   if (auth.storageStatePath) {
@@ -893,6 +979,10 @@ async function captureUrl({ browser, brand, tokens, meta, scene, sceneDir, fontC
     const surface = page.frameLocator('#pdv-frame');
     await page.frames().find((f) => f !== page.mainFrame())?.waitForLoadState('load');
     await killTransitions(page);
+    // Redact before anything is captured, and again after each step, because a
+    // click can re-render the very node that was just sanitised.
+    const { maskLocators } = await applyPiiTreatment(surface, page, pii, { log: ctx.log });
+    const reapplyPii = () => applyPiiTreatment(surface, page, { ...pii, mask: [] });
     const resolvedTargets = {};
 
     if (record) {
@@ -900,6 +990,7 @@ async function captureUrl({ browser, brand, tokens, meta, scene, sceneDir, fontC
         await applyAction(surface, page, { ...step, value: resolveStepValue(step.value, auth) }, {
           setPressed: async () => {}, debug: ctx.debug,
         });
+        await reapplyPii();
         if (step.ms) await page.waitForTimeout(step.ms);
         if (step.selector) {
           const box = await resolveBox(surface, step.selector);
@@ -917,7 +1008,7 @@ async function captureUrl({ browser, brand, tokens, meta, scene, sceneDir, fontC
     const flow = (scene.capture.steps ?? []).map((s) => ({ ...s, value: resolveStepValue(s.value, auth) }));
     if (flow.length) {
       const driver = makeDriver({ page, demoFrame: null, hasRuntime: false, meta, viewport: DEFAULT_DEMO_VIEWPORT });
-      const result = await recordFlow(page, { flow, meta, framesDir, driver, log: ctx.log, debug: ctx.debug });
+      const result = await recordFlow(page, { flow, meta, framesDir, driver, log: ctx.log, debug: ctx.debug, mask: maskLocators });
       await resolveMotionTarget(surface, scene, result.resolvedTargets);
       return {
         framesDir,
@@ -931,7 +1022,7 @@ async function captureUrl({ browser, brand, tokens, meta, scene, sceneDir, fontC
     await rm(framesDir, { recursive: true, force: true });
     await resolveMotionTarget(surface, scene, resolvedTargets);
     const stillPath = join(sceneDir, 'still.png');
-    await shot(page, stillPath);
+    await shot(page, stillPath, { mask: maskLocators });
     return { stillPath, geometryKind: 'still', durationMs: scene.durationMs ?? null, resolvedTargets };
   } finally {
     // The recordVideo path closes the context itself to flush the file.

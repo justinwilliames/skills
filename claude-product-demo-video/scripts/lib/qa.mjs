@@ -163,7 +163,38 @@ export async function gate({ video, storyboard, report, outDir }) {
     checks.push(check('duration', true, `${durationSec.toFixed(2)}s (no render report to compare against)`));
   }
 
-  // 5. Attribution. A CC-BY track with no attribution file is a licence breach,
+  // 5. Narration actually made it in.
+  //
+  //    This check exists because a video shipped the gate with music, no
+  //    voiceover and no captions: the voice stage had never run in that
+  //    directory, scene durations silently fell back to defaults, and every
+  //    other check passed because the FILE was well-formed. A storyboard that
+  //    asks for narration and a render that contains none is a failure, not a
+  //    variant.
+  const narratedScenes = (storyboard?.scenes ?? []).filter((s) => (s.narration ?? '').trim()).length;
+  const wantsVoice = narratedScenes > 0 && (storyboard?.audio?.voice?.provider ?? 'say') !== 'none';
+  if (wantsVoice) {
+    const voTracks = report?.audio?.voTracks ?? null;
+    const burnedIn = Boolean(report?.captions?.burnedIn);
+    checks.push(
+      check(
+        'narration',
+        voTracks === null ? true : voTracks > 0,
+        voTracks === null
+          ? 'no render report — cannot confirm narration'
+          : voTracks > 0
+            ? `${voTracks} voice track(s) for ${narratedScenes} narrated scene(s)`
+            : `${narratedScenes} scene(s) carry narration but the render has 0 voice tracks — run the voice stage`,
+      ),
+    );
+    // With no spoken track, captions are the only way the script reaches the
+    // viewer, so their absence stops being cosmetic.
+    if (voTracks === 0) {
+      checks.push(check('captions-fallback', burnedIn, burnedIn ? 'burned in' : 'no narration AND no burned-in captions — the script reaches nobody'));
+    }
+  }
+
+  // 6. Attribution. A CC-BY track with no attribution file is a licence breach,
   //    so it fails the build rather than warning.
   const attributionPath = join(outDir, 'ATTRIBUTION.md');
   const hasAttribution = await exists(attributionPath);

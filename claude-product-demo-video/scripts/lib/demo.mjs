@@ -445,7 +445,10 @@ button { font: inherit; color: inherit; }
 .pdv-mark {
   width: 34px; height: 34px; border-radius: 10px;
   display: grid; place-items: center;
-  background: linear-gradient(var(--pdv-color-gradient-angle), var(--pdv-color-gradient-from), var(--pdv-color-gradient-to));
+  /* Solid primary, not the brand gradient. The gradient is an atmospheric wash
+     and is often deliberately pale; filling a 34px chip with it leaves the
+     letter unreadable against it. A brand chip wants the brand colour. */
+  background: var(--pdv-color-primary);
   color: var(--pdv-color-on-primary);
   font-family: var(--pdv-font-display); font-weight: var(--pdv-weight-display); font-size: 16px;
 }

@@ -17,8 +17,10 @@
 
 import { execFile } from 'node:child_process';
 import { createHash } from 'node:crypto';
+import { readFileSync } from 'node:fs';
 import { mkdir, readFile, rm, stat, writeFile } from 'node:fs/promises';
-import { dirname, resolve } from 'node:path';
+import { homedir } from 'node:os';
+import { dirname, join, resolve } from 'node:path';
 import { promisify } from 'node:util';
 import process from 'node:process';
 
@@ -33,6 +35,39 @@ const PROVIDER_ENV = {
   elevenlabs: 'ELEVENLABS_API_KEY',
   openai: 'OPENAI_API_KEY',
 };
+
+/**
+ * Key files, checked when the env var is unset.
+ *
+ * An env var means either exporting the key in a shell profile — where it leaks
+ * into every process on the machine — or pasting it into whatever is driving
+ * the build. A mode-600 file in $HOME is the smaller blast radius, and it
+ * survives across shells and sessions without being re-exported.
+ */
+const PROVIDER_KEY_FILE = {
+  elevenlabs: ['.elevenlabs_key', '.elevenlabs', '.config/elevenlabs/key'],
+  openai: ['.openai_key', '.config/openai/key'],
+};
+
+/**
+ * Read a provider key from env, else from the first key file that exists.
+ * The value is returned to the caller and never logged.
+ */
+export function readProviderKey(provider, { env = process.env, home = homedir() } = {}) {
+  const envName = PROVIDER_ENV[provider];
+  if (envName && env[envName]) return { key: env[envName], source: `$${envName}` };
+
+  for (const rel of PROVIDER_KEY_FILE[provider] ?? []) {
+    const path = join(home, rel);
+    try {
+      const text = readFileSync(path, 'utf8').trim();
+      if (text) return { key: text, source: `~/${rel}` };
+    } catch {
+      /* try the next candidate */
+    }
+  }
+  return { key: null, source: null };
+}
 
 async function sh(cmd, args, { debug = () => {}, allowFail = false } = {}) {
   debug(`$ ${cmd} ${args.join(' ')}`);
@@ -73,12 +108,15 @@ export function detectProvider(requested, { platform = process.platform, env = p
   if (want === 'none') return { provider: 'none', reason: null };
 
   if (want === 'elevenlabs' || want === 'openai') {
-    const key = PROVIDER_ENV[want];
-    if (env[key]) return { provider: want, reason: null };
+    const { key, source } = readProviderKey(want, { env });
+    if (key) return { provider: want, reason: null, keySource: source };
     const fallback = platform === 'darwin' ? 'say' : 'none';
+    const files = (PROVIDER_KEY_FILE[want] ?? []).map((f) => `~/${f}`).join(' or ');
     return {
       provider: fallback,
-      reason: `${want} requested but ${key} is not set — falling back to "${fallback}"`,
+      reason:
+        `${want} requested but no key found — falling back to "${fallback}". ` +
+        `Set $${PROVIDER_ENV[want]}, or write the key to ${files} (chmod 600).`,
     };
   }
 
@@ -170,7 +208,7 @@ async function synthElevenLabs(text, dest, { voiceId, debug }) {
   const res = await fetch(url, {
     method: 'POST',
     headers: {
-      'xi-api-key': process.env[PROVIDER_ENV.elevenlabs],
+      'xi-api-key': readProviderKey('elevenlabs').key,
       'content-type': 'application/json',
       accept: 'audio/mpeg',
     },

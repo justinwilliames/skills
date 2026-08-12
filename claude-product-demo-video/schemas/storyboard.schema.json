@@ -188,9 +188,44 @@
               }
             },
             "record": { "type": "boolean", "default": false, "description": "Record video of the interaction instead of a still." },
-            "chrome": { "type": "boolean", "default": true }
+            "chrome": { "type": "boolean", "default": true },
+            "pii": {
+              "type": "object",
+              "description": "REQUIRED for url scenes. Recording a logged-in product puts real customer data into a file that is about to be published, and there is no undo once a video ships — so capture refuses to run until this is declared and acknowledged. Prefer a demo tenant: masking catches what you thought of, a demo tenant has nothing to catch.",
+              "required": ["acknowledged"],
+              "additionalProperties": false,
+              "properties": {
+                "acknowledged": {
+                  "const": true,
+                  "description": "Set only after a human has looked at the screens this scene records and decided what must be hidden."
+                },
+                "replace": {
+                  "type": "array",
+                  "description": "Swap real text for safe text. The best treatment: the frame still reads naturally and nothing sensitive is ever rasterised.",
+                  "items": {
+                    "type": "object",
+                    "required": ["selector"],
+                    "additionalProperties": false,
+                    "properties": {
+                      "selector": { "type": "string" },
+                      "text": { "type": "string", "default": "—" }
+                    }
+                  }
+                },
+                "blur": {
+                  "type": "array",
+                  "items": { "type": "string" },
+                  "description": "CSS blur. For whole regions where replacing every field is impractical."
+                },
+                "mask": {
+                  "type": "array",
+                  "items": { "type": "string" },
+                  "description": "Solid boxes painted at screenshot time, so a late re-render cannot expose what a DOM edit had already replaced. The bluntest and safest treatment."
+                }
+              }
+            }
           },
-          "required": ["kind", "url"],
+          "required": ["kind", "url", "pii"],
           "additionalProperties": false
         },
         {
