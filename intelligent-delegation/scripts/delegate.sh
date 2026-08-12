@@ -566,7 +566,7 @@ cmd_codex() {
   local log="$chunk_dir/codex.jsonl"
   local prompt_file="$chunk_dir/codex.prompt"
   local stderr_file="$chunk_dir/codex.stderr"
-  local model="${CODEX_MODEL:-gpt-5.6-sol}"
+  local model="${CODEX_MODEL:-gpt-5.5}"
   local effort="${CODEX_EFFORT:-medium}"
 
   # Feed the prompt via stdin from a tempfile (`-` tells codex to read stdin).

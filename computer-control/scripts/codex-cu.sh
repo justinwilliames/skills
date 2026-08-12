@@ -110,6 +110,12 @@ parse_common_flags() {
 # Builds CMD array. Args: FEATURE (e.g. computer_use) SANDBOX (e.g. danger-full-access)
 build_cmd() {
     local feature="$1" sandbox="$2"
+    # Default to the agentic tier for screen-driving work. Do NOT inherit config.toml's
+    # model here: that pin is for interactive coding sessions, and a model the account
+    # cannot serve fails as a 400 mid-run ("model is not supported when using Codex with
+    # a ChatGPT account") AFTER the CU app has already opened — which reads like a
+    # capture/permissions failure rather than a model error.
+    [[ -z "$MODEL" ]] && MODEL="gpt-5.6-terra"
     CMD=("$CODEX_BIN" exec --skip-git-repo-check)
     [[ -n "$DIR" ]]    && CMD+=(-C "$DIR")
     [[ -n "$MODEL" ]]  && CMD+=(-m "$MODEL")

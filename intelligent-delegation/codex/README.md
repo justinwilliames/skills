@@ -52,7 +52,7 @@ Once installed, Claude Code uses this skill automatically when delegating to Cod
 Codex is configured via `~/.codex/config.toml`. Recommended defaults:
 
 ```toml
-model = "gpt-5.6-sol"
+model = "gpt-5.5"
 model_reasoning_effort = "xhigh"
 sandbox_mode = "danger-full-access"
 

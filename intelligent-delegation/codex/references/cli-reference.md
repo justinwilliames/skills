@@ -49,7 +49,7 @@
 
 ```bash
 # Model and reasoning
--c model="gpt-5.6-sol"
+-c model="gpt-5.5"
 -c model_reasoning_effort="high"       # low|medium|high|xhigh|max|ultra (5.6 ladder)
 -c model_reasoning_summary="detailed"   # auto|concise|detailed|none
 
@@ -67,7 +67,10 @@
 
 | Model | Use Case |
 |-------|----------|
-| `gpt-5.6-sol` | GPT-5.6 flagship (released 2026-07-09) — the default here. Leads terminal/tool-loop agentic work; near-Fable depth (AA II 59 vs 60); requires codex-cli ≥ 0.144 |
+| `gpt-5.6-sol` | ⛔ **Not servable on ChatGPT-account auth since 12 Aug 2026** — calls 400 with "not supported when using Codex with a ChatGPT account". Historical: GPT-5.6 flagship (2026-07-09), led terminal/tool-loop agentic work, near-Fable depth (AA II 59 vs 60). |
+| `gpt-5.5` | **The default here.** Frontier tier still on the account — complex coding, research, adversarial review. |
+| `gpt-5.6-terra` | Balanced agentic model — the target for screen-driving / Computer Use (`codex-cu.sh` defaults to it). Not for adversarial review (measured recall regression). |
+| `gpt-5.6-luna` / `gpt-5.4-mini` | Fast/cheap tiers. Duplicate Claude lanes; not quality-first targets. |
 | `gpt-5.6-terra` | 5.6 mid-tier — do NOT use for adversarial review (measured −8.6pp recall regression) or long-horizon work (verbose) |
 | `gpt-5.6-luna` | 5.6 efficient tier — duplicates Haiku's lane; unused in this skill |
 | `gpt-5.5` | Previous flagship, still available (not deprecated) — fallback if 5.6 misbehaves |
