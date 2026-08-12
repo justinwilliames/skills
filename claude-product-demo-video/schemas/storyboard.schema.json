@@ -199,9 +199,30 @@
                   "const": true,
                   "description": "Set only after a human has looked at the screens this scene records and decided what must be hidden."
                 },
+                "autoRedact": {
+                  "type": "array",
+                  "items": { "type": "string", "enum": ["email", "phone"] },
+                  "description": "Built-in patterns replaced wherever they appear — text nodes, input values, title/alt/aria-label/href attributes and the document title. Start here: an address or mobile number leaks from the account menu, a tooltip or a form value, and a selector rule only covers the places you predicted. The phone pattern requires 8+ digits so job numbers, totals and dates are not mangled."
+                },
+                "redactText": {
+                  "type": "array",
+                  "description": "Literal strings or regex patterns replaced everywhere, same coverage as autoRedact. Use for names, company names, or anything specific to the account being recorded.",
+                  "items": {
+                    "type": "object",
+                    "additionalProperties": false,
+                    "properties": {
+                      "text": { "type": "string", "description": "Literal string. Regex-escaped, matched case-insensitively unless caseSensitive is set." },
+                      "pattern": { "type": "string", "description": "Raw regex source. Use instead of `text` when a literal will not do." },
+                      "flags": { "type": "string", "default": "g" },
+                      "caseSensitive": { "type": "boolean", "default": false },
+                      "minDigits": { "type": "integer", "description": "Skip a match containing fewer digits than this — the guard that stops a loose numeric pattern eating invoice numbers." },
+                      "replacement": { "type": "string", "default": "—" }
+                    }
+                  }
+                },
                 "replace": {
                   "type": "array",
-                  "description": "Swap real text for safe text. The best treatment: the frame still reads naturally and nothing sensitive is ever rasterised.",
+                  "description": "Selector-targeted swap, for when a whole element should read differently rather than one string being replaced.",
                   "items": {
                     "type": "object",
                     "required": ["selector"],

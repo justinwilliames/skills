@@ -898,9 +898,64 @@ async function captureStorybook({ browser, brand, tokens, meta, scene, sceneDir,
  * what you thought of; a demo tenant has nothing to catch.
  */
 export async function applyPiiTreatment(surface, page, pii, { log } = {}) {
-  if (!pii) return { maskLocators: [], applied: { replace: 0, blur: 0, mask: 0 } };
+  if (!pii) return { maskLocators: [], applied: { replace: 0, blur: 0, mask: 0, text: 0 } };
 
-  const applied = { replace: 0, blur: 0, mask: 0 };
+  const applied = { replace: 0, blur: 0, mask: 0, text: 0 };
+
+  // Text-level redaction runs FIRST and is the strongest guarantee here.
+  // Selector rules only cover the places you predicted; a personal email or
+  // mobile number turns up in the account menu, a tooltip, an aria-label, an
+  // input value and a page title, and missing one of those is the whole risk.
+  // This walks every text node and attribute in the frame instead.
+  const textRules = buildTextRules(pii);
+  if (textRules.length) {
+    applied.text = await surface
+      .locator('body')
+      .evaluate((body, rules) => {
+        const doc = body.ownerDocument;
+        let hits = 0;
+
+        const sub = (value) => {
+          let out = value;
+          for (const r of rules) {
+            const re = new RegExp(r.source, r.flags);
+            out = out.replace(re, (match) => {
+              // Guard the loose phone pattern: 8+ digits or it is a job number,
+              // an invoice total or a date, and replacing it would look wrong.
+              if (r.minDigits && (match.match(/\d/g) ?? []).length < r.minDigits) return match;
+              hits += 1;
+              return r.replacement;
+            });
+          }
+          return out;
+        };
+
+        const walker = doc.createTreeWalker(body, NodeFilter.SHOW_TEXT);
+        const texts = [];
+        while (walker.nextNode()) texts.push(walker.currentNode);
+        for (const node of texts) {
+          const next = sub(node.nodeValue);
+          if (next !== node.nodeValue) node.nodeValue = next;
+        }
+
+        for (const el of doc.querySelectorAll('*')) {
+          for (const attr of ['title', 'alt', 'placeholder', 'aria-label', 'value', 'href']) {
+            const v = el.getAttribute?.(attr);
+            if (typeof v === 'string' && v) {
+              const next = sub(v);
+              if (next !== v) el.setAttribute(attr, next);
+            }
+          }
+          if ('value' in el && typeof el.value === 'string' && el.value) {
+            const next = sub(el.value);
+            if (next !== el.value) el.value = next;
+          }
+        }
+        if (doc.title) doc.title = sub(doc.title);
+        return hits;
+      }, textRules)
+      .catch(() => 0);
+  }
 
   for (const rule of pii.replace ?? []) {
     if (!rule.selector) continue;
@@ -932,9 +987,62 @@ export async function applyPiiTreatment(surface, page, pii, { log } = {}) {
   applied.mask = maskLocators.length;
 
   log?.(
-    `  pii: replaced ${applied.replace} node(s), blurred ${applied.blur} selector(s), masking ${applied.mask} selector(s)`,
+    `  pii: ${applied.text} text hit(s) redacted, ${applied.replace} node(s) replaced, ` +
+      `${applied.blur} selector(s) blurred, ${applied.mask} selector(s) masked`,
   );
   return { maskLocators, applied };
+}
+
+/**
+ * Built-in patterns for the things that leak by default.
+ *
+ * Deliberately conservative on phone: a loose digit run also matches invoice
+ * numbers, dates and job references, and mangling those makes the footage look
+ * broken. The minDigits guard is applied at match time.
+ */
+export const AUTO_PII_PATTERNS = {
+  email: {
+    source: '[A-Za-z0-9._%+-]+@[A-Za-z0-9.-]+\\.[A-Za-z]{2,}',
+    flags: 'g',
+    replacement: 'you@example.com',
+  },
+  phone: {
+    source: '\\+?\\d[\\d\\s().-]{6,}\\d',
+    flags: 'g',
+    replacement: '04xx xxx xxx',
+    minDigits: 8,
+  },
+};
+
+/** Turn `pii.autoRedact` names and `pii.redactText` entries into one rule list. */
+export function buildTextRules(pii = {}) {
+  const rules = [];
+
+  for (const name of pii.autoRedact ?? []) {
+    const preset = AUTO_PII_PATTERNS[name];
+    if (preset) rules.push({ ...preset });
+  }
+
+  for (const rule of pii.redactText ?? []) {
+    if (rule.pattern) {
+      rules.push({
+        source: rule.pattern,
+        flags: rule.flags ?? 'g',
+        replacement: rule.replacement ?? '—',
+        minDigits: rule.minDigits,
+      });
+    } else if (rule.text) {
+      // A literal string: escape it so an address or a name with a dot in it
+      // cannot behave as a regex.
+      rules.push({
+        source: rule.text.replace(/[.*+?^${}()|[\]\\]/g, '\\$&'),
+        flags: rule.caseSensitive ? 'g' : 'gi',
+        replacement: rule.replacement ?? '—',
+      });
+    }
+  }
+
+  return rules;
 }
 
 /** Refuse to record a live product until someone has signed off what is on screen. */
