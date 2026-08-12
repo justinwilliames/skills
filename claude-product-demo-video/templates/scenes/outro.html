@@ -1,0 +1,64 @@
+<meta charset="utf-8">
+<title>pdv scene — outro</title>
+<!--
+  Outro card.
+
+  scene.content:
+    cta         one line telling the viewer what to do next
+    url         overrides brand.url
+    demoNotice  overrides the default demo-footage wording
+
+  Legal slots: brand.legal.disclaimer always renders when present, and the
+  demo-footage notice renders whenever brand.legal.demoFootageNotice is true.
+  Both are set in muted ink and still held to the same contrast floor as the
+  headline — small is not an excuse for unreadable.
+
+  Give this scene a fixed duration of at least 3s; an outro that cuts before
+  the URL can be read is the same as no outro.
+-->
+<link rel="stylesheet" href="_base.css">
+<script src="_base.js"></script>
+
+<div class="stage" data-scene="outro">
+  <div class="stage__wash"></div>
+  <div class="stage__grain"></div>
+
+  <div class="stage__content outro">
+    <div class="logo logo--hero scrim scrim--tight" data-slot="logo"></div>
+    <div class="stack stack--tight scrim outro__copy">
+      <p class="outro__cta" data-ink="text" data-slot="cta" data-fit="2"></p>
+      <p class="outro__url" data-ink="accent" data-slot="url"></p>
+    </div>
+  </div>
+
+  <div class="edge edge--legal">
+    <div class="outro__legal scrim scrim--tight">
+      <p class="legal" data-ink="muted" data-slot="disclaimer"></p>
+      <p class="legal" data-ink="muted" data-slot="demoNotice"></p>
+    </div>
+  </div>
+</div>
+
+<style>
+  .outro { padding-bottom: 14rem; }
+  .outro__copy { text-align: center; }
+  .outro__copy > * { margin-left: auto; margin-right: auto; }
+  .edge--legal { justify-content: center; }
+</style>
+
+<script>
+  PDV.boot(function (d) {
+    var legal = d.brand.legal || {};
+    PDV.setLogo('logo', d.brand, d.meta);
+    PDV.setSlot('cta', d.content.cta || d.brand.tagline);
+    PDV.setSlot('url', d.content.url || d.brand.url);
+    PDV.setSlot('disclaimer', legal.disclaimer || legal.attributionFooter);
+    PDV.setSlot(
+      'demoNotice',
+      legal.demoFootageNotice === true
+        ? (d.content.demoNotice
+          || 'Product footage is a demo build reconstructed from the repository, not a recording of production.')
+        : ''
+    );
+  });
+</script>

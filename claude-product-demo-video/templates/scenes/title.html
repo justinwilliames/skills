@@ -1,0 +1,46 @@
+<meta charset="utf-8">
+<title>pdv scene — title</title>
+<!--
+  Title card.
+
+  scene.content:
+    eyebrow     short kicker above the headline  (default: brand.name)
+    heading     the headline                     (default: meta.title)
+    subheading  one supporting line              (default: meta.subtitle)
+
+  One idea, set large. The headline is the only thing on this frame that is
+  allowed to be long.
+-->
+<link rel="stylesheet" href="_base.css">
+<script src="_base.js"></script>
+
+<div class="stage" data-scene="title">
+  <div class="stage__wash"></div>
+  <div class="stage__grain"></div>
+
+  <div class="stage__content stage__content--with-edge grid">
+    <div class="col-1-9 stack scrim">
+      <p class="eyebrow eyebrow--rule" data-ink="accent" data-slot="eyebrow"></p>
+      <h1 class="display display--xl" data-ink="text" data-slot="heading" data-fit="3"></h1>
+      <p class="lede" data-ink="muted" data-slot="subheading"></p>
+    </div>
+  </div>
+
+  <div class="edge">
+    <div class="logo scrim scrim--tight" data-slot="logo"></div>
+  </div>
+</div>
+
+<style>
+  /* Clear the logo bar so a long lede never runs into it. */
+  .stage__content--with-edge { padding-bottom: 20rem; }
+</style>
+
+<script>
+  PDV.boot(function (d) {
+    PDV.setSlot('eyebrow', d.content.eyebrow || d.brand.name);
+    PDV.setSlot('heading', d.content.heading || d.meta.title);
+    PDV.setSlot('subheading', d.content.subheading || d.content.body || d.meta.subtitle);
+    PDV.setLogo('logo', d.brand, d.meta);
+  });
+</script>

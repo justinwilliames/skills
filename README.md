@@ -33,6 +33,12 @@ The gap between a frontier model and a merely good one is mostly *operating disc
 | [slack-writer](slack-writer/SKILL.md) | Operator-grade Slack copy: authority-first, zero throat-clearing, slop-detection pipeline included |
 | [linkedin-post-writer](linkedin-post-writer/SKILL.md) | LinkedIn posts built from your voice guide: three proven structures, no-fabrication rules, banner compositor |
 
+## Video — applied craft
+
+| Skill | One-line contract |
+|---|---|
+| [claude-product-demo-video](claude-product-demo-video/SKILL.md) | Repo → 1080p on-brand release video: reads GitHub for what shipped, rebuilds the product surface as a local HTML demo, records Chrome, then narrates, scores and renders behind a hard QA gate |
+
 ## Machinery — delegation, loops & bridges
 
 | Skill | One-line contract |

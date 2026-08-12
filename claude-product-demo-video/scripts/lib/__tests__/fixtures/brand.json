@@ -1,0 +1,30 @@
+{
+  "name": "Acme",
+  "tagline": "The workspace your team already knows",
+  "url": "acme.example",
+  "color": {
+    "primary": "#2f5bea",
+    "background": "#0e1116",
+    "surface": "#171b22",
+    "text": "#f3f5f8",
+    "textMuted": "#9aa3b2",
+    "border": "#252b35"
+  },
+  "type": {
+    "display": { "family": "Inter", "weight": 700, "letterSpacingEm": -0.02 },
+    "body": { "family": "Inter", "weight": 400 }
+  },
+  "shape": { "radiusButtonPx": 8, "radiusCardPx": 12 },
+  "motion": {
+    "pace": "standard",
+    "defaultTransition": "fade",
+    "transitionMs": 600,
+    "kenBurnsIntensity": 0.08,
+    "easing": "easeInOutCubic"
+  },
+  "voice": {
+    "tone": "plain-spoken, second person, no hype",
+    "provider": "say",
+    "bannedWords": ["revolutionary", "seamless", "unlock", "empower"]
+  }
+}

@@ -1,0 +1,9 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 420 96" width="420" height="96" role="img" aria-label="Acme Ops">
+  <rect width="96" height="96" rx="24" fill="#ffffff"/>
+  <path d="M22 60 L38 60 L45 40 L54 68 L61 52 L74 52"
+        fill="none" stroke="#101828" stroke-width="7"
+        stroke-linecap="round" stroke-linejoin="round"/>
+  <text x="122" y="63" fill="#ffffff"
+        font-family="'Helvetica Neue', Helvetica, Arial, sans-serif"
+        font-size="46" font-weight="700" letter-spacing="-1">Acme Ops</text>
+</svg>

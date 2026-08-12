@@ -1,0 +1,22 @@
+{
+  "name": "claude-product-demo-video",
+  "version": "0.1.0",
+  "private": false,
+  "type": "module",
+  "description": "Turn a shipped code change into an on-brand 1080p product demo video: read the repo, reconstruct the product surface as a local HTML demo, record Chrome, narrate, score and render.",
+  "license": "MIT",
+  "bin": {
+    "pdv": "./scripts/pdv.mjs"
+  },
+  "engines": {
+    "node": ">=20"
+  },
+  "scripts": {
+    "postinstall": "playwright install chromium",
+    "doctor": "node ./scripts/pdv.mjs doctor",
+    "test": "node --test './scripts/lib/__tests__/*.test.mjs'"
+  },
+  "dependencies": {
+    "playwright": "^1.49.0"
+  }
+}

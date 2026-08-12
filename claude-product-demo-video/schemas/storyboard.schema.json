@@ -1,0 +1,249 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "$id": "https://github.com/justinwilliames/skills/claude-product-demo-video/schemas/storyboard.schema.json",
+  "title": "Storyboard",
+  "description": "The complete shot list for one product release video. Produced by storyboard.mjs, consumed by capture/voice/music/render.",
+  "type": "object",
+  "required": ["meta", "scenes"],
+  "additionalProperties": false,
+  "properties": {
+    "meta": {
+      "type": "object",
+      "required": ["title", "slug"],
+      "additionalProperties": false,
+      "properties": {
+        "title": { "type": "string", "description": "Video title, shown on the title card." },
+        "subtitle": { "type": "string" },
+        "slug": { "type": "string", "pattern": "^[a-z0-9][a-z0-9-]*$", "description": "Output filename stem." },
+        "width": { "type": "integer", "default": 1920 },
+        "height": { "type": "integer", "default": 1080 },
+        "fps": { "type": "integer", "default": 30, "enum": [24, 25, 30, 50, 60] },
+        "aspect": { "type": "string", "default": "16:9" },
+        "brandPath": { "type": "string", "description": "Path to brand.json. Relative paths resolve from the storyboard file." }
+      }
+    },
+    "audio": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "voice": {
+          "type": "object",
+          "additionalProperties": false,
+          "properties": {
+            "provider": { "type": "string", "enum": ["say", "elevenlabs", "openai", "none"], "default": "say" },
+            "voiceId": { "type": "string" },
+            "rateWpm": { "type": "integer", "default": 165 },
+            "gainDb": { "type": "number", "default": 0 }
+          }
+        },
+        "music": {
+          "type": "object",
+          "additionalProperties": false,
+          "properties": {
+            "trackId": { "type": "string", "description": "Key into assets/music/CATALOGUE.json." },
+            "mood": { "type": "string", "enum": ["uplifting", "calm", "focused", "energetic", "cinematic", "none"] },
+            "gainDb": { "type": "number", "default": -18 },
+            "duck": { "type": "boolean", "default": true },
+            "fadeInMs": { "type": "integer", "default": 1200 },
+            "fadeOutMs": { "type": "integer", "default": 2000 }
+          }
+        }
+      }
+    },
+    "captions": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "enabled": { "type": "boolean", "default": true },
+        "style": { "type": "string", "enum": ["bar", "outline", "block"], "default": "bar" },
+        "position": { "type": "string", "enum": ["bottom", "top"], "default": "bottom" },
+        "maxCharsPerLine": { "type": "integer", "default": 42 }
+      }
+    },
+    "scenes": {
+      "type": "array",
+      "minItems": 1,
+      "items": { "$ref": "#/definitions/scene" }
+    }
+  },
+  "definitions": {
+    "scene": {
+      "type": "object",
+      "required": ["id", "capture"],
+      "additionalProperties": false,
+      "properties": {
+        "id": { "type": "string", "pattern": "^[a-z0-9][a-z0-9-]*$" },
+        "type": {
+          "type": "string",
+          "enum": ["title", "feature", "stat", "steps", "quote", "product", "outro"],
+          "description": "Semantic role. Drives default template, default motion and default duration."
+        },
+        "durationMs": {
+          "type": "integer",
+          "minimum": 500,
+          "description": "Explicit duration. Omit to derive from narration length plus padding."
+        },
+        "narration": { "type": "string", "description": "Spoken script for this scene. Also the caption source." },
+        "content": {
+          "type": "object",
+          "description": "Template-specific fields (heading, body, bullets, statValue, statLabel...). Passed verbatim into the HTML template.",
+          "additionalProperties": true
+        },
+        "capture": { "$ref": "#/definitions/capture" },
+        "motion": { "$ref": "#/definitions/motion" },
+        "transitionOut": { "$ref": "#/definitions/transition" }
+      }
+    },
+    "capture": {
+      "type": "object",
+      "required": ["kind"],
+      "oneOf": [
+        {
+          "properties": {
+            "kind": { "const": "html" },
+            "template": { "type": "string", "description": "Filename under templates/scenes/, e.g. feature.html" }
+          },
+          "required": ["kind"],
+          "additionalProperties": false
+        },
+        {
+          "properties": {
+            "kind": { "const": "demo" },
+            "app": { "type": "string", "description": "Demo app id. Built into work/demo/<app>/ and served on localhost." },
+            "spec": { "type": "string", "description": "Path to the demo-spec.json describing screens, data and interactions. Generated from repo facts." },
+            "flow": {
+              "type": "array",
+              "description": "Scripted interaction replayed while recording. Each step advances the demo and may carry its own narration cue.",
+              "items": {
+                "type": "object",
+                "required": ["action"],
+                "additionalProperties": false,
+                "properties": {
+                  "action": {
+                    "type": "string",
+                    "enum": ["click", "fill", "hover", "press", "wait", "scroll", "waitForSelector", "moveCursor", "highlight", "clearHighlight", "setState", "toast", "goto"]
+                  },
+                  "selector": { "type": "string" },
+                  "key": { "type": "string", "description": "State key, for setState. Not every product change is user-initiated — a call arriving or a sync completing has no button to click." },
+                  "value": {
+                    "description": "fill text, key to press, setState value, toast text, or goto screen id.",
+                    "type": ["string", "boolean", "number"]
+                  },
+                  "ms": { "type": "integer" },
+                  "label": { "type": "string", "description": "Optional on-screen callout shown during this step." }
+                }
+              }
+            },
+            "cursor": { "type": "boolean", "default": true, "description": "Draw a synthetic cursor that eases between targets. Real mouse pointers are not captured by the compositor." },
+            "chrome": { "type": "boolean", "default": true, "description": "Composite inside a branded browser frame." },
+            "viewport": {
+              "type": "array",
+              "items": { "type": "integer" },
+              "minItems": 2,
+              "maxItems": 2,
+              "default": [1600, 900]
+            }
+          },
+          "required": ["kind", "app"],
+          "additionalProperties": false
+        },
+        {
+          "properties": {
+            "kind": { "const": "storybook" },
+            "baseUrl": { "type": "string", "description": "Running Storybook origin, e.g. http://localhost:6006" },
+            "storyId": { "type": "string", "description": "Story id, e.g. components-button--primary" },
+            "selector": { "type": "string", "description": "Optional element to frame instead of the full canvas." },
+            "chrome": { "type": "boolean", "default": true, "description": "Composite the capture inside a branded browser frame." }
+          },
+          "required": ["kind", "storyId"],
+          "additionalProperties": false
+        },
+        {
+          "properties": {
+            "kind": { "const": "url" },
+            "url": { "type": "string" },
+            "auth": {
+              "type": "object",
+              "description": "Credential source. Values are env var NAMES, never literals.",
+              "additionalProperties": false,
+              "properties": {
+                "storageStatePath": { "type": "string" },
+                "usernameEnv": { "type": "string" },
+                "passwordEnv": { "type": "string" }
+              }
+            },
+            "steps": {
+              "type": "array",
+              "description": "Playwright actions replayed before/while capturing.",
+              "items": {
+                "type": "object",
+                "required": ["action"],
+                "additionalProperties": false,
+                "properties": {
+                  "action": { "type": "string", "enum": ["click", "fill", "hover", "press", "wait", "scroll", "waitForSelector"] },
+                  "selector": { "type": "string" },
+                  "value": { "type": "string" },
+                  "ms": { "type": "integer" }
+                }
+              }
+            },
+            "record": { "type": "boolean", "default": false, "description": "Record video of the interaction instead of a still." },
+            "chrome": { "type": "boolean", "default": true }
+          },
+          "required": ["kind", "url"],
+          "additionalProperties": false
+        },
+        {
+          "properties": {
+            "kind": { "const": "asset" },
+            "path": { "type": "string", "description": "PNG, JPG or MP4 used verbatim." },
+            "fit": { "type": "string", "enum": ["cover", "contain", "pad"], "default": "cover" }
+          },
+          "required": ["kind", "path"],
+          "additionalProperties": false
+        }
+      ]
+    },
+    "motion": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "type": { "type": "string", "enum": ["kenburns", "autozoom", "none"], "default": "kenburns" },
+        "from": {
+          "type": "array",
+          "description": "[centerX, centerY, scale] at scene start. Centre coords are 0-1 fractions of frame.",
+          "items": { "type": "number" },
+          "minItems": 3,
+          "maxItems": 3
+        },
+        "to": {
+          "type": "array",
+          "items": { "type": "number" },
+          "minItems": 3,
+          "maxItems": 3
+        },
+        "target": {
+          "description": "autozoom destination: an explicit [x,y,w,h] box in pixels, or a CSS selector resolved at capture time.",
+          "oneOf": [
+            { "type": "array", "items": { "type": "number" }, "minItems": 4, "maxItems": 4 },
+            { "type": "string" }
+          ]
+        },
+        "holdMs": { "type": "integer", "default": 0, "description": "Time held at the start pose before the move begins." },
+        "easing": { "type": "string", "enum": ["linear", "easeInOutCubic", "easeOutQuint"], "default": "easeInOutCubic" }
+      }
+    },
+    "transition": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "type": {
+          "type": "string",
+          "enum": ["fade", "dissolve", "wipeleft", "wiperight", "slideup", "slidedown", "circleopen", "smoothleft", "none"],
+          "default": "fade"
+        },
+        "durationMs": { "type": "integer", "default": 600, "minimum": 100, "maximum": 2000 }
+      }
+    }
+  }
+}

@@ -1,0 +1,199 @@
+{
+  "id": "example",
+  "product": { "name": "Acme Ops", "mark": "A" },
+  "viewport": [1600, 900],
+  "initialScreen": "jobs",
+  "state": { "connected": false, "loading": false },
+
+  "nav": [
+    { "id": "nav-jobs", "label": "Jobs", "icon": "list", "screen": "jobs", "badge": "6" },
+    { "id": "nav-invoices", "label": "Invoices", "icon": "doc", "screen": "invoices" },
+    { "id": "nav-integrations", "label": "Integrations", "icon": "link", "screen": "integrations" },
+    { "id": "nav-reports", "label": "Reports", "icon": "chart", "screen": "reports" }
+  ],
+
+  "topbar": {
+    "search": "Search jobs, invoices and customers",
+    "actions": [
+      { "id": "btn-new-job", "label": "New job", "variant": "primary", "icon": "plus", "action": { "type": "goto", "screen": "jobs" } }
+    ],
+    "avatar": { "name": "Jordan Blake", "initials": "JB", "meta": "Acme Plumbing" }
+  },
+
+  "screens": [
+    {
+      "id": "jobs",
+      "title": "Jobs",
+      "subtitle": "Everything booked this week",
+      "elements": [
+        {
+          "kind": "cards",
+          "columns": 3,
+          "items": [
+            { "id": "card-open", "icon": "inbox", "title": "6", "body": "Open jobs", "meta": "2 unassigned" },
+            { "id": "card-today", "icon": "calendar", "title": "3", "body": "Scheduled today", "meta": "Next at 10:30" },
+            { "id": "card-value", "icon": "bolt", "title": "$4,120", "body": "Booked this week", "meta": "Sample data" }
+          ]
+        },
+        {
+          "kind": "table",
+          "id": "jobs-table",
+          "caption": "This week",
+          "columns": [
+            { "key": "ref", "label": "Job", "strong": true },
+            { "key": "customer", "label": "Customer" },
+            { "key": "scheduled", "label": "Scheduled" },
+            { "key": "status", "label": "Status" },
+            { "key": "total", "label": "Total", "align": "right" }
+          ],
+          "rows": [
+            { "id": "row-1042", "ref": "JOB-1042", "customer": "Jordan Blake", "scheduled": "Mon 10:30", "status": { "kind": "badge", "label": "Scheduled", "tone": "info" }, "total": "$480.00" },
+            { "id": "row-1043", "ref": "JOB-1043", "customer": "Priya Raman", "scheduled": "Mon 14:00", "status": { "kind": "badge", "label": "In progress", "tone": "warning" }, "total": "$260.00" },
+            { "id": "row-1044", "ref": "JOB-1044", "customer": "Sam Okafor", "scheduled": "Tue 09:00", "status": { "kind": "badge", "label": "Complete", "tone": "success" }, "total": "$1,150.00" },
+            { "id": "row-1045", "ref": "JOB-1045", "customer": "Lena Marsh", "scheduled": "Wed 11:15", "status": { "kind": "badge", "label": "Unassigned", "tone": "danger" }, "total": "$320.00" }
+          ]
+        },
+        { "kind": "skeleton", "id": "jobs-loading", "lines": 4, "when": { "loading": true } }
+      ]
+    },
+
+    {
+      "id": "invoices",
+      "title": "Invoices",
+      "layout": "two-col",
+      "elements": [
+        {
+          "kind": "list",
+          "id": "invoice-list",
+          "title": "Awaiting payment",
+          "items": [
+            { "id": "inv-1042", "icon": "doc", "title": "INV-1042", "meta": "Jordan Blake · due in 6 days", "badge": "$480.00" },
+            { "id": "inv-1039", "icon": "doc", "title": "INV-1039", "meta": "Sam Okafor · due today", "badge": "$1,150.00", "badgeTone": "warning" },
+            { "id": "inv-1031", "avatar": "Priya Raman", "initials": "PR", "title": "INV-1031", "meta": "Priya Raman · overdue 4 days", "badge": "$260.00", "badgeTone": "danger" }
+          ]
+        },
+        {
+          "kind": "row",
+          "items": [
+            { "kind": "avatar", "id": "invoice-owner", "name": "Jordan Blake", "initials": "JB", "meta": "Account owner" },
+            { "kind": "badge", "label": "Sample data", "tone": "neutral" },
+            { "kind": "icon", "name": "gear", "label": "Invoice settings" },
+            { "kind": "button", "id": "btn-send-invoice", "label": "Send reminder", "variant": "secondary", "action": { "type": "toast", "toast": "reminder-sent" } }
+          ]
+        },
+        { "kind": "divider" },
+        { "kind": "text", "text": "Reminders send from your own business address. Invented sample records shown.", "muted": true }
+      ]
+    },
+
+    {
+      "id": "integrations",
+      "title": "Integrations",
+      "subtitle": "Connect the tools your office already runs on",
+      "elements": [
+        { "kind": "heading", "level": 2, "text": "PaymentsCo", "sub": "Push paid invoices straight into your accounting ledger." },
+        {
+          "kind": "row",
+          "items": [
+            { "kind": "badge", "id": "pc-status-off", "label": "Not connected", "tone": "neutral", "when": { "connected": false } },
+            { "kind": "badge", "id": "pc-status-on", "label": "Connected", "tone": "success", "when": { "connected": true } },
+            {
+              "kind": "button",
+              "id": "btn-connect",
+              "label": "Connect PaymentsCo",
+              "variant": "primary",
+              "icon": "link",
+              "when": { "connected": false },
+              "action": { "type": "openOverlay", "overlay": "connect" }
+            },
+            {
+              "kind": "button",
+              "id": "btn-manage",
+              "label": "Manage connection",
+              "variant": "secondary",
+              "when": { "connected": true },
+              "action": { "type": "openOverlay", "overlay": "job-detail" }
+            }
+          ]
+        },
+        {
+          "kind": "toggle",
+          "id": "toggle-autosync",
+          "label": "Sync invoices automatically",
+          "description": "Every invoice marked paid is pushed within a minute.",
+          "stateKey": "connected"
+        },
+        { "kind": "field", "id": "field-ledger", "label": "Default ledger", "inputType": "select", "value": "Trade income", "hint": "Applied to every synced invoice." },
+        { "kind": "skeleton", "id": "integrations-loading", "lines": 3, "when": { "loading": true } }
+      ]
+    },
+
+    {
+      "id": "reports",
+      "title": "Reports",
+      "elements": [
+        {
+          "kind": "empty",
+          "id": "reports-empty",
+          "icon": "chart",
+          "title": "No reports yet",
+          "body": "Reports appear once a full week of jobs has been completed.",
+          "action": { "id": "btn-empty-cta", "label": "Back to jobs", "variant": "secondary", "action": { "type": "goto", "screen": "jobs" } }
+        }
+      ]
+    }
+  ],
+
+  "overlays": [
+    {
+      "id": "connect",
+      "kind": "modal",
+      "title": "Connect PaymentsCo",
+      "subtitle": "Acme Ops only ever reads the accounts you pick.",
+      "elements": [
+        { "kind": "field", "id": "field-account", "label": "Account", "inputType": "select", "value": "Acme Plumbing (main)" },
+        { "kind": "field", "id": "field-email", "label": "Billing email", "inputType": "text", "value": "accounts@acme.example" },
+        { "kind": "field", "id": "field-note", "label": "Note on synced invoices", "inputType": "textarea", "placeholder": "Optional" },
+        { "kind": "text", "text": "Sample credentials. Nothing here reaches a real account.", "muted": true }
+      ],
+      "actions": [
+        { "id": "btn-cancel", "label": "Cancel", "variant": "secondary", "action": { "type": "closeOverlay" } },
+        {
+          "id": "btn-confirm",
+          "label": "Connect",
+          "variant": "primary",
+          "action": [
+            { "type": "setState", "key": "connected", "value": true },
+            { "type": "closeOverlay" },
+            { "type": "toast", "toast": "connected" }
+          ]
+        }
+      ]
+    },
+    {
+      "id": "job-detail",
+      "kind": "drawer",
+      "title": "JOB-1042",
+      "subtitle": "Jordan Blake · Monday 10:30",
+      "elements": [
+        { "kind": "avatar", "name": "Jordan Blake", "initials": "JB", "meta": "14 Foundry Lane" },
+        { "kind": "badge", "label": "Scheduled", "tone": "info" },
+        { "kind": "text", "text": "Replace the hot water isolation valve and pressure test the line." },
+        { "kind": "divider" },
+        { "kind": "field", "id": "field-tech", "label": "Assigned to", "inputType": "select", "value": "Sam Okafor" },
+        { "kind": "list", "title": "Activity", "items": [
+          { "id": "act-1", "icon": "check", "title": "Job created", "meta": "Mon 08:12" },
+          { "id": "act-2", "icon": "bell", "title": "Customer notified", "meta": "Mon 08:13" }
+        ] }
+      ],
+      "actions": [
+        { "id": "btn-drawer-close", "label": "Close", "variant": "secondary", "action": { "type": "closeOverlay" } }
+      ]
+    }
+  ],
+
+  "toasts": [
+    { "id": "connected", "text": "PaymentsCo connected", "tone": "success" },
+    { "id": "reminder-sent", "text": "Reminder sent to Jordan Blake", "tone": "neutral" }
+  ]
+}

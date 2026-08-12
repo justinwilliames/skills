@@ -1,0 +1,59 @@
+<meta charset="utf-8">
+<title>pdv scene — quote</title>
+<!--
+  Pull quote.
+
+  scene.content:
+    quote        the line, under 25 words
+    attribution  { name, role } — or attributionName / attributionRole
+
+  Past about 25 words a quote stops reading as a quote and starts reading as
+  a paragraph, so the type steps down and the frame is flagged rather than
+  silently truncated.
+-->
+<link rel="stylesheet" href="_base.css">
+<script src="_base.js"></script>
+
+<div class="stage" data-scene="quote">
+  <div class="stage__wash"></div>
+  <div class="stage__grain"></div>
+
+  <div class="stage__content grid">
+    <figure class="col-1-10 stack scrim quote__figure">
+      <blockquote class="quote" data-ink="text" data-slot="quote" data-fit="5"></blockquote>
+      <figcaption class="attrib">
+        <span class="attrib__rule" aria-hidden="true"></span>
+        <span>
+          <span class="attrib__name" data-ink="text" data-slot="attributionName"></span>
+          <span class="attrib__role" data-ink="muted" data-slot="attributionRole"></span>
+        </span>
+      </figcaption>
+    </figure>
+  </div>
+</div>
+
+<style>
+  .quote__figure { margin: 0; }
+  .quote__figure .quote,
+  .quote__figure .attrib { position: relative; z-index: 1; }
+  .attrib__name, .attrib__role { display: block; }
+  .quote--long { font-size: 4.8rem; }
+</style>
+
+<script>
+  PDV.boot(function (d) {
+    var attribution = d.content.attribution || {};
+    var text = d.content.quote || d.content.body || '';
+    var words = text.split(/\s+/).filter(Boolean).length;
+
+    var el = document.querySelector('[data-slot="quote"]');
+    if (words > 25) {
+      el.classList.add('quote--long');
+      el.setAttribute('data-overlong', String(words));
+    }
+
+    PDV.setSlot('quote', text ? '“' + text.replace(/^["“]|["”]$/g, '') + '”' : '');
+    PDV.setSlot('attributionName', attribution.name || d.content.attributionName);
+    PDV.setSlot('attributionRole', attribution.role || d.content.attributionRole);
+  });
+</script>

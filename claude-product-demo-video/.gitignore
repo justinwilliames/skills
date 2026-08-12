@@ -1,0 +1,15 @@
+# Scratch space for a build. Every file here is regenerable from the storyboard.
+work/
+
+# Rendered videos. Large, regenerable, and often carry unreleased product footage.
+out/
+
+# Fetched music. Never commit audio — see docs/MUSIC-LICENSING.md.
+assets/music/*.mp3
+assets/music/*.wav
+assets/music/*.m4a
+assets/music/*.ogg
+
+node_modules/
+.DS_Store
+*.log

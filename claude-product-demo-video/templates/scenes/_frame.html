@@ -1,0 +1,175 @@
+<meta charset="utf-8">
+<title>pdv — browser frame</title>
+<!--
+  Branded browser chrome. capture.mjs wraps `demo` and `url` captures in this so
+  product footage reads as a product, not as a screenshot pasted on a slide.
+
+  window.__DATA = {
+    brand,                       // same shape as every scene template
+    frame: {
+      url:        "app.acme.example/jobs",   // shown in the pill
+      title:      "Jobs",                    // optional, right of the pill
+      insetPct:   4,                         // window margin, % of the frame
+      contentSrc: "/abs/shot.png",           // still or video composited in
+      contentUrl: "http://localhost:5173/"   // or a live page in an iframe
+    }
+  }
+
+  Contract:
+    window.PDVFrame.slot        the element the capture goes into
+    window.PDVFrame.metrics()   { x, y, width, height, dpr } of that slot, in
+                                CSS px — what ffmpeg needs to place footage
+    document.documentElement.dataset.ready === 'true'
+
+  The chrome never sits on top of the page: the title bar is a sibling above
+  the viewport, and the viewport clips its own content. Everything is sized in
+  rem (1rem = 1/108 frame height), so it scales to any output size unchanged.
+-->
+<link rel="stylesheet" href="_base.css">
+<script src="_base.js"></script>
+
+<div class="stage" data-scene="frame">
+  <div class="stage__wash"></div>
+  <div class="stage__grain"></div>
+
+  <div class="window" id="pdv-window">
+    <div class="window__bar">
+      <span class="window__dots" aria-hidden="true"><i></i><i></i><i></i></span>
+      <span class="window__pill" data-ink="muted" data-slot="url"></span>
+      <span class="window__title" data-ink="muted" data-slot="title"></span>
+    </div>
+    <div class="window__view" id="pdv-frame-slot"></div>
+  </div>
+</div>
+
+<style>
+  .window {
+    position: absolute;
+    z-index: 2;
+    inset: var(--pdv-frame-inset, 4.4%);
+    display: flex;
+    flex-direction: column;
+    overflow: hidden;
+    border-radius: var(--pdv-frame-radius, 1.8rem);
+    border: 0.1rem solid var(--pdv-color-border, #dfe4ee);
+    background: var(--pdv-color-surface, #f6f8fc);
+    box-shadow: var(--pdv-shadow-card, 0 24px 64px rgba(0, 0, 0, 0.18));
+  }
+
+  .window__bar {
+    flex: none;
+    height: var(--pdv-frame-bar-h, 4.6rem);
+    display: flex;
+    align-items: center;
+    gap: 1.8rem;
+    padding: 0 1.8rem;
+    background: var(--pdv-color-surface-alt, #eef1f7);
+    border-bottom: 0.1rem solid var(--pdv-color-border, #dfe4ee);
+  }
+
+  .window__dots { display: flex; gap: 0.8rem; flex: none; }
+
+  /*
+   * Not --pdv-color-border: surface-alt is mix(surface, text, 0.04), so a
+   * border-coloured dot on the bar is 1.13:1 in both polarities and the dots
+   * vanish — the frame stops reading as a window. A tint of the text colour
+   * tracks the polarity: measured 3.81:1 on light and 5.34:1 on dark, both
+   * clear of the 3:1 non-text floor. 55% is the light polarity's number; the
+   * cheaper-looking 24% only reaches 1.67:1 there.
+   */
+  .window__dots i {
+    width: 1.3rem;
+    height: 1.3rem;
+    border-radius: 50%;
+    background: color-mix(in srgb, var(--pdv-color-text, #101828) 55%, transparent);
+  }
+
+  .window__pill {
+    flex: 0 1 auto;
+    max-width: 52%;
+    padding: 0.5rem 1.6rem;
+    border-radius: 999px;
+    background: var(--pdv-color-background, #ffffff);
+    border: 0.1rem solid var(--pdv-color-border, #dfe4ee);
+    font-family: var(--pdv-font-body, sans-serif);
+    font-size: 1.8rem;
+    line-height: 1.4;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+  }
+
+  /*
+   * Pushed to the far right. No browser puts a page title beside the omnibox,
+   * so sitting it there read as a half-drawn tab; on the right it reads as a
+   * deliberate status label, which is what the slot actually is.
+   */
+  .window__title {
+    margin-left: auto;
+    font-family: var(--pdv-font-body, sans-serif);
+    font-size: 1.8rem;
+    line-height: 1.4;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+  }
+
+  /* The capture lands here and is clipped by it — never over the bar. */
+  .window__view {
+    flex: 1 1 auto;
+    position: relative;
+    overflow: hidden;
+    background: var(--pdv-color-background, #ffffff);
+  }
+
+  .window__view > img,
+  .window__view > video,
+  .window__view > iframe {
+    display: block;
+    width: 100%;
+    height: 100%;
+    border: 0;
+    object-fit: cover;
+    object-position: top center;
+  }
+</style>
+
+<script>
+  PDV.boot(function (d) {
+    var frame = (d.scene && d.scene.frame) || (window.__DATA && window.__DATA.frame) || {};
+    var root = document.documentElement;
+
+    if (frame.insetPct != null) root.style.setProperty('--pdv-frame-inset', frame.insetPct + '%');
+    root.style.setProperty('--pdv-frame-radius', 'calc(' + (d.tokens['radius-card'] || '12px') + ' * 1.5)');
+
+    PDV.setSlot('url', frame.url || d.brand.url);
+    PDV.setSlot('title', frame.title);
+
+    var slot = document.getElementById('pdv-frame-slot');
+    if (frame.contentUrl) {
+      var iframe = document.createElement('iframe');
+      iframe.src = frame.contentUrl;
+      slot.appendChild(iframe);
+    } else if (frame.contentSrc) {
+      var isVideo = /\.(mp4|webm|mov)$/i.test(frame.contentSrc);
+      var media = document.createElement(isVideo ? 'video' : 'img');
+      if (isVideo) { media.muted = true; media.autoplay = false; }
+      media.src = PDV.resolveUrl(frame.contentSrc, d.meta && d.meta.brandDir);
+      slot.appendChild(media);
+    }
+
+    window.PDVFrame = {
+      slot: slot,
+      metrics: function () {
+        var r = slot.getBoundingClientRect();
+        return {
+          x: Math.round(r.x),
+          y: Math.round(r.y),
+          width: Math.round(r.width),
+          height: Math.round(r.height),
+          dpr: window.devicePixelRatio || 1,
+        };
+      },
+    };
+  });
+</script>

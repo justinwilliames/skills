@@ -1,0 +1,49 @@
+<meta charset="utf-8">
+<title>pdv scene — stat</title>
+<!--
+  Stat card.
+
+  scene.content:
+    eyebrow     what is being measured
+    statValue   the number — "3.4x", "92%", "1,240"   (alias: value)
+    statLabel   short phrase under it                  (alias: label)
+    source      where the figure came from             (optional)
+
+  The number is the hero and nothing else on the frame competes with it. If
+  the figure has no source it should not be on screen at all.
+-->
+<link rel="stylesheet" href="_base.css">
+<script src="_base.js"></script>
+
+<div class="stage" data-scene="stat">
+  <div class="stage__wash"></div>
+  <div class="stage__grain"></div>
+
+  <div class="stage__content grid">
+    <div class="col-1-10 stack scrim">
+      <p class="eyebrow eyebrow--rule" data-ink="accent" data-slot="eyebrow"></p>
+      <p class="stat" data-ink="accent" data-slot="statValue" data-fit="1"></p>
+      <p class="stat__label" data-ink="text" data-slot="statLabel" data-fit="2"></p>
+    </div>
+  </div>
+
+  <div class="edge">
+    <p class="legal scrim scrim--tight" data-ink="muted" data-slot="source"></p>
+  </div>
+</div>
+
+<style>
+  .stat { white-space: nowrap; }
+  /* The gaps around the number come from _base.css's optical rhythm block, so
+     the stat card and the master stack cannot drift apart. Nothing to override
+     here — a per-template margin is what inverted the rhythm last time. */
+</style>
+
+<script>
+  PDV.boot(function (d) {
+    PDV.setSlot('eyebrow', d.content.eyebrow);
+    PDV.setSlot('statValue', d.content.statValue || d.content.value);
+    PDV.setSlot('statLabel', d.content.statLabel || d.content.label);
+    PDV.setSlot('source', d.content.source);
+  });
+</script>

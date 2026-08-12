@@ -1,0 +1,83 @@
+<meta charset="utf-8">
+<title>pdv scene — steps</title>
+<!--
+  Steps card.
+
+  scene.content:
+    eyebrow  short kicker
+    heading  what the sequence achieves
+    steps    3-5 entries, each a string or { title, body }
+
+  Markers carry the brand colour and each row declares its own --i, so a
+  staggered reveal is available by setting data-motion="on" on <html>.
+  More than five rows is a different scene, not a longer list.
+-->
+<link rel="stylesheet" href="_base.css">
+<script src="_base.js"></script>
+
+<div class="stage" data-scene="steps">
+  <div class="stage__wash"></div>
+  <div class="stage__grain"></div>
+
+  <div class="stage__content grid steps__layout">
+    <div class="col-1-5 stack scrim steps__intro">
+      <p class="eyebrow eyebrow--rule" data-ink="accent" data-slot="eyebrow"></p>
+      <h2 class="display display--m" data-ink="text" data-slot="heading" data-fit="4"></h2>
+    </div>
+
+    <ol class="col-7-12 steps scrim" data-slot="steps"></ol>
+  </div>
+</div>
+
+<style>
+  .steps__layout { align-content: center; }
+  .steps__intro { align-self: center; }
+  .steps { align-self: center; }
+</style>
+
+<script>
+  PDV.boot(function (d) {
+    PDV.setSlot('eyebrow', d.content.eyebrow);
+    PDV.setSlot('heading', d.content.heading || d.meta.title);
+
+    var list = document.querySelector('[data-slot="steps"]');
+    var steps = Array.isArray(d.content.steps) ? d.content.steps.slice(0, 5) : [];
+    list.innerHTML = '';
+    if (!steps.length) {
+      list.classList.add('is-hidden');
+      return;
+    }
+    steps.forEach(function (raw, i) {
+      var step = typeof raw === 'string' ? { title: raw } : (raw || {});
+      var li = document.createElement('li');
+      li.className = 'step';
+      li.style.setProperty('--i', String(i));
+
+      var marker = document.createElement('span');
+      marker.className = 'step__marker';
+      var markerNumber = document.createElement('span');
+      markerNumber.setAttribute('data-ink', 'onPrimary');
+      markerNumber.textContent = String(i + 1);
+      marker.appendChild(markerNumber);
+
+      var copy = document.createElement('div');
+      var title = document.createElement('p');
+      title.className = 'step__title';
+      title.setAttribute('data-ink', 'text');
+      title.textContent = step.title || step.label || '';
+      copy.appendChild(title);
+
+      if (step.body) {
+        var body = document.createElement('p');
+        body.className = 'step__body';
+        body.setAttribute('data-ink', 'muted');
+        body.textContent = step.body;
+        copy.appendChild(body);
+      }
+
+      li.appendChild(marker);
+      li.appendChild(copy);
+      list.appendChild(li);
+    });
+  });
+</script>

@@ -1,0 +1,430 @@
+/*
+ * Scene base. Every value that can be branded is a `--pdv-*` custom property
+ * using the exact token names emitted by scripts/lib/util.mjs `cssVars('pdv')`,
+ * so a token set written by Node and one derived in the browser are the same
+ * thing. The fallbacks in `var()` are the neutral look when no brand is given.
+ *
+ * Layout unit: 1rem == 1/108th of frame height, so 1rem == 10px at 1080p and
+ * every size scales with the frame instead of the browser window.
+ */
+
+*,
+*::before,
+*::after { box-sizing: border-box; }
+
+html {
+  /* 1rem = 10px at 1080p; scales for 720p/1440p renders without edits. */
+  font-size: calc(100vh / 108);
+  background: var(--pdv-color-background, #ffffff);
+
+  /*
+   * ONE horizontal rail for the whole system. Body copy, the 12-column grid
+   * and every piece of corner furniture start here — there is no second left
+   * edge to drift from. Declared here rather than left as a var() fallback so
+   * a brand that overrides it moves everything at once; two independent
+   * fallbacks are how the logo ended up 44px left of the headline.
+   */
+  --pdv-rail: 14rem;
+  /* Vertical title-safe inset. Independent of the rail on purpose: a 16:9
+     frame has far less vertical room to give away. */
+  --pdv-safe-y: 9.6rem;
+}
+
+body {
+  margin: 0;
+  height: 100vh;
+  overflow: hidden;
+  background: var(--pdv-color-background, #ffffff);
+  color: var(--pdv-color-text, #101828);
+  font-family: var(--pdv-font-body, -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Arial, sans-serif);
+  font-weight: var(--pdv-weight-body, 400);
+  -webkit-font-smoothing: antialiased;
+  text-rendering: optimizeLegibility;
+  font-kerning: normal;
+}
+
+/* ── stage ─────────────────────────────────────────────────────────────── */
+
+.stage {
+  position: relative;
+  width: 100vw;
+  height: 100vh;
+  overflow: hidden;
+  isolation: isolate;
+  background: var(--pdv-color-background, #ffffff);
+}
+
+/*
+ * Atmospheric wash. Two off-centre blobs plus a weak directional sweep — never
+ * a flat half-and-half split, which reads as a slide master.
+ */
+.stage__wash {
+  position: absolute;
+  inset: 0;
+  z-index: 0;
+  background:
+    radial-gradient(78% 96% at 8% 4%, var(--pdv-wash-a, rgba(47, 91, 234, 0.18)) 0%, transparent 62%),
+    radial-gradient(66% 88% at 96% 104%, var(--pdv-wash-b, rgba(18, 185, 129, 0.16)) 0%, transparent 58%),
+    linear-gradient(var(--pdv-color-gradient-angle, 135deg), var(--pdv-wash-c, rgba(47, 91, 234, 0.06)) 0%, transparent 52%, var(--pdv-wash-d, rgba(18, 185, 129, 0.06)) 100%);
+}
+
+/*
+ * Grain. Large flat fills band badly once H.264 gets hold of them; ~5% of
+ * monochrome noise dithers the ramp and the artefact goes away. Do not remove.
+ */
+.stage__grain {
+  position: absolute;
+  inset: 0;
+  z-index: 1;
+  pointer-events: none;
+  opacity: var(--pdv-grain-opacity, 0.05);
+  background-repeat: repeat;
+  background-size: 320px 320px;
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='320' height='320'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.9' numOctaves='3' stitchTiles='stitch'/%3E%3CfeColorMatrix type='saturate' values='0'/%3E%3C/filter%3E%3Crect width='320' height='320' filter='url(%23n)'/%3E%3C/svg%3E");
+}
+
+.stage__content {
+  position: relative;
+  z-index: 2;
+  height: 100%;
+  padding: var(--pdv-pad-y, 10rem) var(--pdv-rail);
+}
+
+/* 12 columns, generous gutters. Nothing is ever placed outside this box. */
+.grid {
+  display: grid;
+  grid-template-columns: repeat(12, 1fr);
+  column-gap: var(--pdv-gutter, 3.2rem);
+  align-content: center;
+  height: 100%;
+}
+
+.col-1-5  { grid-column: 1 / span 5; }
+.col-1-6  { grid-column: 1 / span 6; }
+.col-1-7  { grid-column: 1 / span 7; }
+.col-1-8  { grid-column: 1 / span 8; }
+.col-1-9  { grid-column: 1 / span 9; }
+.col-1-10 { grid-column: 1 / span 10; }
+.col-1-12 { grid-column: 1 / span 12; }
+.col-2-10 { grid-column: 2 / span 10; }
+.col-7-12 { grid-column: 7 / span 6; }
+.col-8-12 { grid-column: 8 / span 5; }
+
+.stack > * + * { margin-top: var(--pdv-stack-gap, 3.2rem); }
+.stack--tight > * + * { margin-top: 1.8rem; }
+
+/*
+ * Optical rhythm. Display type is set at line-height < 1, so its box is
+ * shorter than its glyphs and a margin measured off the box under-delivers —
+ * anything following needs the difference back.
+ *
+ * The gap after an element scales with that element's INK, not its box. At
+ * 1080p the display's ink is ~99px tall and the stat's is ~248px, so they
+ * cannot share one number: 4.8rem gives the display ~62px optical (0.6x its
+ * ink) and would give the stat only 43px (0.17x). The stat gets 7.6rem, which
+ * measures ~95px — 0.38x its ink, and the largest gap on the frame, which is
+ * what the heaviest pair on the frame is owed.
+ *
+ * Specificity: the type resets further down this sheet (`.stat { margin: 0 }`
+ * and friends) are 0-1-0 and come LATER, so they beat `.stack > * + *`. Every
+ * rule in this block is 0-2-0 on purpose. Do not flatten it.
+ */
+.stack > .display + *,
+.stack > .quote + * { margin-top: 4.8rem; }
+
+.stack > * + .stat { margin-top: 2.4rem; }
+.stack > .stat + * { margin-top: 7.6rem; }
+
+/*
+ * Corner furniture shares the body copy's rail horizontally, and sits on the
+ * title-safe inset vertically. Both edges survive a Ken Burns push of 0.08,
+ * which crops 4% per edge (77px horizontal, 43px vertical at 1080p).
+ */
+.edge {
+  position: absolute;
+  z-index: 3;
+  inset: auto var(--pdv-rail) var(--pdv-safe-y);
+  display: flex;
+  align-items: flex-end;
+  justify-content: space-between;
+  gap: 4rem;
+}
+
+.edge--top { inset: var(--pdv-safe-y) var(--pdv-rail) auto; align-items: flex-start; }
+
+/* ── scrim ─────────────────────────────────────────────────────────────── */
+
+/*
+ * Type over a wash gets a soft pool of the background colour behind it. It is
+ * invisible at a glance and it makes the backdrop under every glyph a known
+ * colour instead of a gradient sample, which is what keeps contrast provable.
+ */
+.scrim { position: relative; }
+
+/*
+ * A blurred solid, not a radial gradient: a radial falls off from the centre,
+ * so the top line of a tall block lands in the falloff and loses contrast. A
+ * blurred rectangle keeps a full-strength plateau over the whole text box and
+ * only feathers outside it.
+ */
+.scrim::before {
+  content: '';
+  position: absolute;
+  z-index: -1;
+  inset: -12rem -16rem;
+  border-radius: 12rem;
+  background: var(--pdv-scrim-core, rgba(255, 255, 255, 0.94));
+  /* The blur must be wide enough that the pool's edge is not readable as a
+     shape. It also eats inward, so the outset above has to clear it. */
+  filter: blur(9rem);
+}
+
+/* Corner furniture needs a pool too, but a much smaller one. */
+.scrim--tight::before {
+  inset: -7rem -9rem;
+  border-radius: 8rem;
+  filter: blur(5.5rem);
+}
+
+/* ── type ──────────────────────────────────────────────────────────────── */
+
+.eyebrow {
+  margin: 0;
+  font-family: var(--pdv-font-body, sans-serif);
+  font-size: var(--pdv-fs-eyebrow, 2.2rem);
+  font-weight: 600;
+  line-height: 1.2;
+  letter-spacing: 0.2em;
+  text-transform: uppercase;
+}
+
+.eyebrow--rule { display: flex; align-items: center; gap: 1.6rem; }
+
+.eyebrow--rule::before {
+  content: '';
+  width: 5.6rem;
+  height: 0.4rem;
+  border-radius: 0.4rem;
+  background: var(--pdv-color-primary, #2f5bea);
+  flex: none;
+}
+
+.display {
+  margin: 0;
+  font-family: var(--pdv-font-display, sans-serif);
+  font-weight: var(--pdv-weight-display, 700);
+  letter-spacing: var(--pdv-tracking-display, -0.02em);
+  /*
+   * 0.98 left 11px (0.098em) between a descender and the next line's ascender
+   * at the 11.2rem size — survivable on the fallback stack, but many geometric
+   * and grotesque sans faces carry 0.22-0.26em descenders against the ~0.19em
+   * here and would close it. 1.04 buys ~7px a line and nothing else moves.
+   */
+  line-height: 1.04;
+  text-wrap: balance;
+}
+
+.display--xl { font-size: var(--pdv-fs-display, 11.2rem); }
+.display--l  { font-size: var(--pdv-fs-h1, 8.8rem); }
+.display--m  { font-size: var(--pdv-fs-h2, 6.4rem); }
+
+.lede {
+  margin: 0;
+  font-size: var(--pdv-fs-lede, 3.4rem);
+  line-height: 1.36;
+  font-weight: 400;
+  max-width: 32ch;
+  text-wrap: pretty;
+}
+
+.body {
+  margin: 0;
+  font-size: var(--pdv-fs-body, 2.8rem);
+  line-height: 1.42;
+}
+
+.legal {
+  margin: 0;
+  font-size: var(--pdv-fs-legal, 1.9rem);
+  line-height: 1.5;
+  max-width: 68ch;
+  text-wrap: pretty;
+}
+
+/* ── stat ──────────────────────────────────────────────────────────────── */
+
+.stat {
+  margin: 0;
+  font-family: var(--pdv-font-display, sans-serif);
+  font-weight: var(--pdv-weight-display, 700);
+  font-size: var(--pdv-fs-stat, 34rem);
+  line-height: 0.84;
+  letter-spacing: -0.045em;
+  font-variant-numeric: tabular-nums lining-nums;
+}
+
+.stat__label {
+  margin: 0;
+  font-size: var(--pdv-fs-h2, 6.4rem);
+  font-family: var(--pdv-font-display, sans-serif);
+  font-weight: var(--pdv-weight-display, 700);
+  letter-spacing: var(--pdv-tracking-display, -0.02em);
+  line-height: 1.06;
+  max-width: 18ch;
+}
+
+/* ── steps ─────────────────────────────────────────────────────────────── */
+
+.steps { list-style: none; margin: 0; padding: 0; display: grid; row-gap: 3.6rem; }
+
+.step { display: grid; grid-template-columns: 5.2rem 1fr; column-gap: 2.4rem; align-items: start; }
+
+/* The number is a child of the disc, not the disc itself, so hiding ink for a
+   backdrop probe leaves the fill it is measured against on screen.
+   The disc is sized off the step title, not off the row: 5.2rem is ~1.6x the
+   44px title's cap height, so it reads as a marker beside a heading. At 8.4rem
+   it overhung the title's line box and pushed 27px into the body copy. */
+.step__marker {
+  width: 5.2rem;
+  height: 5.2rem;
+  margin-top: 0.4rem;
+  border-radius: 50%;
+  display: grid;
+  place-items: center;
+  background: var(--pdv-color-primary, #2f5bea);
+}
+
+.step__marker span {
+  font-family: var(--pdv-font-display, sans-serif);
+  font-weight: var(--pdv-weight-display, 700);
+  font-size: 2.4rem;
+  line-height: 1;
+  font-variant-numeric: tabular-nums;
+}
+
+.step__title {
+  margin: 0;
+  font-family: var(--pdv-font-display, sans-serif);
+  font-weight: var(--pdv-weight-display, 700);
+  font-size: 4.4rem;
+  line-height: 1.12;
+  letter-spacing: var(--pdv-tracking-display, -0.02em);
+}
+
+.step__body { margin: 0.8rem 0 0; font-size: 2.6rem; line-height: 1.4; max-width: 36ch; text-wrap: pretty; }
+
+/* Steps carry a stagger so a reveal is possible. It is OFF unless the capture
+   opts in, because a still frame must be deterministic. */
+.step { opacity: 1; transform: none; }
+
+[data-motion='on'] .step {
+  animation: pdv-rise 620ms cubic-bezier(0.22, 0.61, 0.36, 1) both;
+  animation-delay: calc(var(--i, 0) * 130ms);
+}
+
+@keyframes pdv-rise {
+  from { opacity: 0; transform: translateY(3.2rem); }
+  to   { opacity: 1; transform: none; }
+}
+
+/* ── quote ─────────────────────────────────────────────────────────────── */
+
+.quote {
+  margin: 0;
+  font-family: var(--pdv-font-display, sans-serif);
+  font-weight: var(--pdv-weight-display, 700);
+  font-size: var(--pdv-fs-quote, 6.4rem);
+  line-height: 1.16;
+  letter-spacing: var(--pdv-tracking-display, -0.02em);
+  /* balance, not pretty: `pretty` only guards the last line and let a two-line
+     quote break as 8 words + 1. A pull quote is display type, so it gets the
+     same even rag as `.display`. */
+  text-wrap: balance;
+  /*
+   * Hang the opening curly quote. Without this the first line starts at the
+   * punctuation and every later line starts at a letter, so the block's left
+   * edge stair-steps by the width of a U+201C (24.6px at 6.4rem). Chrome does
+   * not support `hanging-punctuation`, so a negative first-line indent is the
+   * only route. -0.38em matches the measured glyph advance.
+   */
+  text-indent: -0.38em;
+}
+
+.attrib {
+  display: flex;
+  /* Top-aligned, not centred: centring a rule against a two-line name+role
+     block parks it in the gap between them, pointing at neither. */
+  align-items: flex-start;
+  gap: 2.4rem;
+  margin: 0;
+}
+
+.attrib__rule {
+  width: 4.8rem;
+  height: 0.4rem;
+  border-radius: 0.4rem;
+  background: var(--pdv-color-primary, #2f5bea);
+  flex: none;
+  /* Drops the rule onto the optical centre of the NAME's first line. */
+  margin-top: 1.6rem;
+}
+
+.attrib__name { font-size: 2.8rem; font-weight: 600; line-height: 1.3; }
+.attrib__role { font-size: 2.4rem; line-height: 1.3; }
+
+/* ── logo ──────────────────────────────────────────────────────────────── */
+
+.logo { display: flex; align-items: center; gap: 2rem; }
+
+.logo__img {
+  display: block;
+  height: var(--pdv-logo-h, 7.2rem);
+  width: auto;
+  max-width: 46rem;
+  object-fit: contain;
+}
+
+/* Wordmark fallback when no logo file resolves — deliberate, not broken. */
+.logo__word {
+  font-family: var(--pdv-font-display, sans-serif);
+  font-weight: var(--pdv-weight-display, 700);
+  font-size: 3.6rem;
+  letter-spacing: -0.015em;
+  line-height: 1;
+}
+
+.logo--hero .logo__img { height: var(--pdv-logo-hero-h, 13rem); max-width: 76rem; }
+.logo--hero .logo__word { font-size: 7.2rem; }
+
+/* ── outro ─────────────────────────────────────────────────────────────── */
+
+.outro { display: grid; place-items: center; text-align: center; height: 100%; align-content: center; row-gap: 4rem; }
+
+.outro__cta + .outro__url { margin-top: 3rem; }
+
+.outro__url {
+  margin: 0;
+  font-size: 3.6rem;
+  letter-spacing: 0.02em;
+  font-weight: 600;
+}
+
+.outro__cta {
+  margin: 0;
+  font-family: var(--pdv-font-display, sans-serif);
+  font-weight: var(--pdv-weight-display, 700);
+  font-size: var(--pdv-fs-h2, 6.4rem);
+  line-height: 1.1;
+  letter-spacing: var(--pdv-tracking-display, -0.02em);
+  max-width: 24ch;
+}
+
+.outro__legal { display: grid; row-gap: 1rem; justify-items: center; text-align: center; }
+
+/* ── utility ───────────────────────────────────────────────────────────── */
+
+.is-hidden { display: none !important; }
+
+/* Backdrop probe: hide ink without disturbing layout so the renderer can
+   sample the true composited background under every text box. */
+[data-probe='bg'] .ink { visibility: hidden; }

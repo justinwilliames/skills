@@ -1,0 +1,58 @@
+<meta charset="utf-8">
+<title>pdv scene — feature</title>
+<!--
+  Feature card.
+
+  scene.content:
+    eyebrow   capability label
+    heading   what it does, in one phrase
+    body      one supporting line — one, not three
+
+  The right third is deliberately empty. It is where an auto-zoom or a
+  following product shot lands, and it is what keeps the frame from reading
+  as a bullet slide.
+-->
+<link rel="stylesheet" href="_base.css">
+<script src="_base.js"></script>
+
+<div class="stage" data-scene="feature">
+  <div class="stage__wash"></div>
+  <div class="stage__grain"></div>
+
+  <div class="stage__content grid">
+    <div class="col-1-8 stack scrim feature__block">
+      <p class="eyebrow eyebrow--rule" data-ink="accent" data-slot="eyebrow"></p>
+      <h2 class="display display--l" data-ink="text" data-slot="heading" data-fit="3"></h2>
+      <p class="lede" data-ink="muted" data-slot="body"></p>
+    </div>
+  </div>
+</div>
+
+<style>
+  /* A single hairline anchors the block to the left column without boxing it. */
+  .feature__block { padding-left: 3.2rem; }
+
+  .feature__block::after {
+    content: '';
+    position: absolute;
+    left: 0;
+    top: 0.6rem;
+    bottom: 0.6rem;
+    width: 0.3rem;
+    border-radius: 0.3rem;
+    background: linear-gradient(
+      180deg,
+      var(--pdv-color-primary, #2f5bea) 0%,
+      var(--pdv-color-accent, #12b981) 100%
+    );
+    opacity: 0.9;
+  }
+</style>
+
+<script>
+  PDV.boot(function (d) {
+    PDV.setSlot('eyebrow', d.content.eyebrow || d.scene.id || 'New');
+    PDV.setSlot('heading', d.content.heading || d.meta.title);
+    PDV.setSlot('body', d.content.body || d.content.subheading);
+  });
+</script>

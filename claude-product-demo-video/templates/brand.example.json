@@ -1,0 +1,88 @@
+{
+  "name": "Acme Ops",
+  "tagline": "Operations software for field teams",
+  "url": "acme.example",
+
+  "logo": {
+    "primary": "assets/brand-example/logo-acme-ops.svg",
+    "inverse": "assets/brand-example/logo-acme-ops-inverse.svg",
+    "mark": "assets/brand-example/mark-acme-ops.svg",
+    "safeAreaRatio": 0.5,
+    "minHeightPx": 72
+  },
+
+  "color": {
+    "primary": "#2f5bea",
+    "secondary": "#1b2a4a",
+    "accent": "#12b981",
+    "background": "#ffffff",
+    "surface": "#f6f8fc",
+    "text": "#101828",
+    "textMuted": "#5b6577",
+    "border": "#dfe4ee",
+    "gradient": {
+      "from": "#2f5bea",
+      "to": "#12b981",
+      "angleDeg": 135
+    }
+  },
+
+  "type": {
+    "display": {
+      "family": "Acme Sans",
+      "fallbackStack": "-apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif",
+      "weight": 700,
+      "letterSpacingEm": -0.02,
+      "license": "No font binary ships with this example: Acme Sans is invented, so every frame here renders on the fallbackStack above and that is the intended behaviour. Add a fontFiles array of local woff2 paths for your own licensed face and record its terms in this field — the renderer runs offline and never fetches a font it was not given."
+    },
+    "body": {
+      "family": "Acme Sans",
+      "fallbackStack": "-apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif",
+      "weight": 400,
+      "license": "No font binary ships with this example — see type.display.license. Every frame renders on the fallbackStack above."
+    },
+    "mono": {
+      "family": "Acme Mono",
+      "fallbackStack": "ui-monospace, SFMono-Regular, 'SF Mono', Menlo, Consolas, monospace"
+    }
+  },
+
+  "shape": {
+    "radiusButtonPx": 8,
+    "radiusCardPx": 14,
+    "shadow": "0 24px 64px rgba(16, 24, 40, 0.14)"
+  },
+
+  "motion": {
+    "pace": "standard",
+    "defaultTransition": "fade",
+    "transitionMs": 600,
+    "kenBurnsIntensity": 0.08,
+    "easing": "easeInOutCubic"
+  },
+
+  "voice": {
+    "tone": "plain-spoken, second person, no hype, short sentences",
+    "provider": "say",
+    "voiceId": "Samantha",
+    "bannedWords": ["revolutionary", "seamless", "game-changing", "effortless"],
+    "spellings": {
+      "acme ops": "Acme Ops",
+      "api": "A P I"
+    }
+  },
+
+  "assets": {
+    "introVideo": "assets/brand-example/intro-sting.mp4",
+    "outroVideo": "assets/brand-example/outro-sting.mp4",
+    "backgroundImages": ["assets/brand-example/backdrop-grid.svg"],
+    "watermark": "assets/brand-example/mark-acme-ops.svg",
+    "guidelinesDoc": "https://acme.example/brand"
+  },
+
+  "legal": {
+    "attributionFooter": "Music licensed CC-BY — see ATTRIBUTION.md",
+    "disclaimer": "Acme Ops is a fictional product used to document this pipeline.",
+    "demoFootageNotice": true
+  }
+}

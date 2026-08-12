@@ -1,0 +1,14 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1920 1080" width="1920" height="1080" role="img" aria-label="Acme Ops backdrop">
+  <defs>
+    <pattern id="acmeGrid" width="120" height="120" patternUnits="userSpaceOnUse">
+      <path d="M120 0 L0 0 0 120" fill="none" stroke="#2f5bea" stroke-opacity="0.10" stroke-width="1.5"/>
+    </pattern>
+    <radialGradient id="acmeFalloff" cx="0.5" cy="0.42" r="0.72">
+      <stop offset="0" stop-color="#ffffff" stop-opacity="0"/>
+      <stop offset="1" stop-color="#ffffff" stop-opacity="1"/>
+    </radialGradient>
+  </defs>
+  <rect width="1920" height="1080" fill="#ffffff"/>
+  <rect width="1920" height="1080" fill="url(#acmeGrid)"/>
+  <rect width="1920" height="1080" fill="url(#acmeFalloff)"/>
+</svg>
