@@ -55,7 +55,7 @@
     PDV.setSlot('disclaimer', legal.disclaimer || legal.attributionFooter);
     PDV.setSlot(
       'demoNotice',
-      legal.demoFootageNotice === true
+      legal.demoFootageNotice === true && (d.meta && d.meta.hasReconstructedFootage) !== false
         ? (d.content.demoNotice
           || 'Product footage is a demo build reconstructed from the repository, not a recording of production.')
         : ''

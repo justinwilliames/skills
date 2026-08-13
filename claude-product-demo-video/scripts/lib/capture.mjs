@@ -693,6 +693,16 @@ export async function run(ctx) {
      meta.brandDir. Without it every template silently falls back to the system
      face — the brand font 404s against templates/scenes/ and nothing says so. */
   meta.brandDir = dirname(brandPath);
+  /* The demo-footage notice exists to stop a reconstruction being mistaken for
+     production. A storyboard with no reconstructed footage must not carry it:
+     a disclaimer about something the video does not contain is not caution,
+     it is just wrong. Templates read meta.hasReconstructedFootage. */
+  meta.hasReconstructedFootage = (storyboard.scenes ?? []).some(
+    (s) => s.capture?.kind === 'demo',
+  );
+  if (!meta.hasReconstructedFootage) {
+    ctx.log('capture: no reconstructed footage in this storyboard — demo-footage notice suppressed');
+  }
   const brand = await embedBrandImages(rawBrand, { cwd: dirname(brandPath), log: ctx.log });
   for (const w of warnings) ctx.log(`  brand warning: ${w}`);
   const fontCss = await fontFaceCss(brand, { cwd: dirname(brandPath), log: ctx.log });
