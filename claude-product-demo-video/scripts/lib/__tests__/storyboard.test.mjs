@@ -105,11 +105,27 @@ test('copy: no exclamation marks, no banned words, one idea per sentence', async
 test('consecutive scenes never repeat the same move', async () => {
   const { storyboard } = await build();
   for (let i = 1; i < storyboard.scenes.length; i += 1) {
+    const prev = storyboard.scenes[i - 1].motion;
+    const cur = storyboard.scenes[i].motion;
+    // 'none' is the absence of a camera move, not a move, so two adjacent
+    // static scenes are not a repeat. Templates that animate their own
+    // elements all resolve to none; requiring them to differ would force a
+    // camera push back onto scenes that are already moving.
+    if (prev?.type === 'none' && cur?.type === 'none') continue;
     assert.notEqual(
-      JSON.stringify(storyboard.scenes[i - 1].motion),
-      JSON.stringify(storyboard.scenes[i].motion),
+      JSON.stringify(prev),
+      JSON.stringify(cur),
       `scenes ${storyboard.scenes[i - 1].id} and ${storyboard.scenes[i].id} make the same move`,
     );
+  }
+});
+
+test('an html scene gets a static camera, a captured scene still gets a move', async () => {
+  const { storyboard } = await build();
+  for (const scene of storyboard.scenes) {
+    if (scene.capture?.kind === 'html') {
+      assert.equal(scene.motion?.type, 'none', `${scene.id} pushes the camera over a self-animating template`);
+    }
   }
 });
 

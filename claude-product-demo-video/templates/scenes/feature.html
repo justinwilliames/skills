@@ -1,7 +1,7 @@
 <meta charset="utf-8">
 <title>pdv scene — feature</title>
 <!--
-  Feature card.
+  Feature card, as a seekable timeline.
 
   scene.content:
     eyebrow   capability label
@@ -11,6 +11,18 @@
   The right third is deliberately empty. It is where an auto-zoom or a
   following product shot lands, and it is what keeps the frame from reading
   as a bullet slide.
+
+  Exposes the seekable contract (docs/SEEKABLE-SCENES.md):
+    window.__pdvDuration = 5000
+    window.__pdvSeek(ms)   pure with respect to time — no wall clock anywhere.
+
+  THE CAMERA IS INTENTIONALLY STATIC. The left hairline draws down its own
+  length, the eyebrow rule draws across, the headline rises word by word and
+  the body follows — the scene has its own motion, so a Ken Burns push over it
+  is redundant. Give this scene `motion: { "type": "none" }` in the storyboard.
+
+  Only `transform` and `opacity` are ever written. The un-seeked page is the
+  FINAL composed frame, so a consumer that never seeks still gets the poster.
 -->
 <link rel="stylesheet" href="_base.css">
 <script src="_base.js"></script>
@@ -46,13 +58,145 @@
       var(--pdv-color-accent, #12b981) 100%
     );
     opacity: 0.9;
+    /* Draws downward along its own length. Absolutely positioned, so scaling
+       it cannot move the type it sits beside. */
+    transform: scaleY(var(--tl-bar, 1));
+    transform-origin: center top;
   }
+
+  /* ── timeline surfaces ─────────────────────────────────────────────────
+     Every default is the COMPOSED value: correct before the first seek and
+     identical to the pre-timeline design at the end of it. */
+
+  [data-scene='feature'] .stage__wash,
+  [data-scene='feature'] .eyebrow,
+  [data-scene='feature'] .lede { will-change: transform, opacity; }
+
+  /* The eyebrow rule is a flex item; scaling it leaves its 5.6rem box, and so
+     the eyebrow's text position, untouched. */
+  [data-scene='feature'] .eyebrow--rule::before {
+    transform: scaleX(var(--tl-rule, 1));
+    transform-origin: left center;
+  }
+
+  [data-scene='feature'] .tl-w { display: inline-block; will-change: transform, opacity; }
 </style>
 
 <script>
+(function () {
+  'use strict';
+
+  var DUR = 5000;
+
+  /* ── easing ─────────────────────────────────────────────────────────────
+     `at` clamps, so a seek past the declared duration holds the final state
+     instead of overshooting — what the recorder needs when narration runs
+     longer than the timeline. */
+
+  function at(ms, start, dur) {
+    if (dur <= 0) return ms >= start ? 1 : 0;
+    return Math.max(0, Math.min(1, (ms - start) / dur));
+  }
+  function eOut(t) { return 1 - Math.pow(1 - t, 3); }
+  function eInOut(t) { return t < 0.5 ? 4 * t * t * t : 1 - Math.pow(-2 * t + 2, 3) / 2; }
+
+  /* ── the timeline ───────────────────────────────────────────────────────
+     Beats overlap: the bar is still drawing while the eyebrow rises, and the
+     eyebrow is still settling as the first word leaves. Last motion ends at
+     4100ms, so the final 900ms holds. */
+
+  var BEAT = {
+    wash:     { s: 0,    d: 1100 },
+    bar:      { s: 320,  d: 760 },
+    rule:     { s: 460,  d: 620 },
+    eyebrow:  { s: 520,  d: 560 },
+    wordFrom: 860, wordDur: 640, wordSpread: 560, wordStepMax: 110,
+    body:     { s: 1680, d: 720 },
+    breathe:  { s: 2900, d: 1200 },
+  };
+
+  var S = { built: false, split: false, words: [] };
+
+  /* Fit runs on flat text (inline-block words each report their own line box,
+     which drives _base.js's line count — and the headline — to the floor), so
+     the split happens on the first seek instead. */
+  function splitWords(node, heading) {
+    node.innerHTML = '';
+    var words = [];
+    String(heading || '').split(/\n/).forEach(function (line, li) {
+      if (li) node.appendChild(document.createElement('br'));
+      line.trim().split(/\s+/).filter(Boolean).forEach(function (w, wi) {
+        if (wi) node.appendChild(document.createTextNode(' '));
+        var span = document.createElement('span');
+        span.className = 'tl-w';
+        span.textContent = w;
+        node.appendChild(span);
+        words.push(span);
+      });
+    });
+    return words;
+  }
+
+  function ensure() {
+    if (S.split) return;
+    S.split = true;
+    S.words = S.headingEl && S.heading ? splitWords(S.headingEl, S.heading) : [];
+  }
+
+  function rise(node, t, px) {
+    if (!node) return;
+    node.style.opacity = String(t);
+    node.style.transform = 'translate3d(0,' + ((1 - t) * px) + 'px,0)';
+  }
+
+  function seek(ms) {
+    if (!S.built) return;
+    ensure();
+    var t;
+
+    /* Settles in from slightly oversized rather than blooming up from 0.80:
+       the wash's gradients are sized to their own box, so any scale under 1
+       uncovers the page colour at the frame edge. */
+    var wash = eOut(at(ms, BEAT.wash.s, BEAT.wash.d));
+    var breathe = eInOut(at(ms, BEAT.breathe.s, BEAT.breathe.d));
+    S.wash.style.opacity = String(0.22 + 0.78 * wash);
+    S.wash.style.transform = 'scale(' + (1.14 - 0.14 * wash + 0.04 * breathe) + ')';
+
+    S.block.style.setProperty('--tl-bar', String(eOut(at(ms, BEAT.bar.s, BEAT.bar.d))));
+
+    t = eOut(at(ms, BEAT.rule.s, BEAT.rule.d));
+    S.eyebrow.style.setProperty('--tl-rule', String(t));
+    rise(S.eyebrow, eOut(at(ms, BEAT.eyebrow.s, BEAT.eyebrow.d)), 20);
+
+    var n = S.words.length;
+    var step = n > 1 ? Math.min(BEAT.wordStepMax, BEAT.wordSpread / (n - 1)) : 0;
+    for (var i = 0; i < n; i += 1) {
+      rise(S.words[i], eOut(at(ms, BEAT.wordFrom + step * i, BEAT.wordDur)), 36);
+    }
+
+    rise(S.body, eOut(at(ms, BEAT.body.s, BEAT.body.d)), 24);
+  }
+
+  window.__pdvDuration = DUR;
+  window.__pdvSeek = seek;
+
   PDV.boot(function (d) {
     PDV.setSlot('eyebrow', d.content.eyebrow || d.scene.id || 'New');
     PDV.setSlot('heading', d.content.heading || d.meta.title);
     PDV.setSlot('body', d.content.body || d.content.subheading);
+
+    S.headingEl = document.querySelector('[data-slot="heading"]');
+    S.heading = d.content.heading || d.meta.title || '';
+    S.wash = document.querySelector('.stage__wash');
+    S.block = document.querySelector('.feature__block');
+    S.eyebrow = document.querySelector('.eyebrow');
+    S.body = document.querySelector('[data-slot="body"]');
+
+    // A re-render through window.__render restores flat text, so the split has
+    // to happen again on the next seek.
+    S.words = [];
+    S.split = false;
+    S.built = true;
   });
+}());
 </script>

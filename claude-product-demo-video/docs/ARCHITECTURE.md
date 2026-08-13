@@ -99,10 +99,15 @@ the skill at `owner/name` and it works from anywhere.
 
 ## Motion model
 
-Stills become motion through `zoompan`. Two motion types:
+Stills become motion through `zoompan`. Three motion types:
 
-- **`kenburns`** — a slow continuous push or pull across the frame. Applied to
-  title and feature scenes to keep static compositions alive.
+- **`none`** — no camera move. This is the right answer for every scene that
+  animates its own elements, which is now all of `title`, `feature`, `steps`,
+  `outro` and `showcase`: they are seekable timelines, and a slow push layered
+  over choreography is the clearest tell of a cheap product video.
+- **`kenburns`** — a slow continuous push or pull across the frame. It exists
+  for genuine stills — an imported image or screenshot with nothing moving
+  inside it. Do not put it over a seekable template.
 - **`autozoom`** — a timed push into a named region, mirroring the way a viewer's
   eye moves to the element being described. The region is either an explicit
   `[x, y, w, h]` box or a CSS selector resolved during capture, so the zoom
@@ -110,6 +115,12 @@ Stills become motion through `zoompan`. Two motion types:
 
 Motion is computed as keyframes in `motion.mjs` and emitted as an ffmpeg filter
 string. Easing defaults to `easeInOutCubic`; linear zooms read as mechanical.
+
+NOTE (open): `storyboard.mjs assemble()` still stamps `kenBurns(i, brand)` onto
+every scene that did not get its own motion, which includes all four HTML
+templates above. Until that default changes, a generated storyboard needs
+`motion: { "type": "none" }` set by hand on its title/feature/steps/outro
+scenes.
 
 ## Audio model
 

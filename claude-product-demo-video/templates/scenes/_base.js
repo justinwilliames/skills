@@ -9,9 +9,10 @@
  *   document.documentElement.dataset.ready === 'true' when fonts have settled
  *                                                     and layout is final —
  *                                                     wait on this, not a timer
- *   document.documentElement.dataset.motion = 'on'    opt in to reveal motion;
- *                                                     off by default so a still
- *                                                     frame is deterministic
+ *   window.__pdvDuration / window.__pdvSeek(ms)       optional; a template that
+ *                                                     exposes them is captured
+ *                                                     as a frame sequence
+ *                                                     (docs/SEEKABLE-SCENES.md)
  *   window.PDV.probeContrast()                        [{role, fg, rect, ...}]
  *   document.documentElement.dataset.probe = 'bg'     hide ink, keep layout
  *

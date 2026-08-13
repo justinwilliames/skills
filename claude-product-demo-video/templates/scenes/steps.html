@@ -1,16 +1,31 @@
 <meta charset="utf-8">
 <title>pdv scene — steps</title>
 <!--
-  Steps card.
+  Steps card, as a seekable timeline.
 
   scene.content:
     eyebrow  short kicker
     heading  what the sequence achieves
     steps    3-5 entries, each a string or { title, body }
 
-  Markers carry the brand colour and each row declares its own --i, so a
-  staggered reveal is available by setting data-motion="on" on <html>.
   More than five rows is a different scene, not a longer list.
+
+  Exposes the seekable contract (docs/SEEKABLE-SCENES.md):
+    window.__pdvDuration = 6000
+    window.__pdvSeek(ms)   pure with respect to time — no wall clock anywhere.
+
+  THE CAMERA IS INTENTIONALLY STATIC. The list is the motion: rows land one at
+  a time, each glyph settling into its marker a beat behind its own row, so the
+  sequence reads as a sequence rather than as a block that faded in. A Ken
+  Burns push over that is redundant — give this scene
+  `motion: { "type": "none" }` in the storyboard.
+
+  The stagger lives in the timeline, NOT in the old `data-motion="on"` CSS
+  animation: a CSS animation outranks an inline style, so a wall-clock keyframe
+  would silently override every value __pdvSeek writes. That rule is gone.
+
+  Only `transform` and `opacity` are ever written. The un-seeked page is the
+  FINAL composed frame, so a consumer that never seeks still gets the poster.
 -->
 <link rel="stylesheet" href="_base.css">
 <script src="_base.js"></script>
@@ -33,9 +48,131 @@
   .steps__layout { align-content: center; }
   .steps__intro { align-self: center; }
   .steps { align-self: center; }
+
+  /* ── timeline surfaces ─────────────────────────────────────────────────
+     Every default is the COMPOSED value: correct before the first seek and
+     identical to the pre-timeline design at the end of it. */
+
+  [data-scene='steps'] .stage__wash,
+  [data-scene='steps'] .eyebrow,
+  [data-scene='steps'] .step,
+  [data-scene='steps'] .step__marker { will-change: transform, opacity; }
+
+  /* The eyebrow rule is a flex item; scaling it leaves its 5.6rem box, and so
+     the eyebrow's text position, untouched. */
+  [data-scene='steps'] .eyebrow--rule::before {
+    transform: scaleX(var(--tl-rule, 1));
+    transform-origin: left center;
+  }
+
+  [data-scene='steps'] .tl-w { display: inline-block; will-change: transform, opacity; }
 </style>
 
 <script>
+(function () {
+  'use strict';
+
+  var DUR = 6000;
+
+  /* ── easing ─────────────────────────────────────────────────────────────
+     `at` clamps, so a seek past the declared duration holds the final state
+     rather than overshooting — what the recorder needs when narration runs
+     longer than the timeline. */
+
+  function at(ms, start, dur) {
+    if (dur <= 0) return ms >= start ? 1 : 0;
+    return Math.max(0, Math.min(1, (ms - start) / dur));
+  }
+  function eOut(t) { return 1 - Math.pow(1 - t, 3); }
+  function eInOut(t) { return t < 0.5 ? 4 * t * t * t : 1 - Math.pow(-2 * t + 2, 3) / 2; }
+
+  /* ── the timeline ───────────────────────────────────────────────────────
+     The heading is still arriving when the first row lands, and each glyph
+     settles 90ms behind its own row, so nothing in the frame is ever waiting
+     its turn in silence. Last motion ends at 5100ms of 6000, so the final
+     900ms holds. */
+
+  var BEAT = {
+    wash:     { s: 0,    d: 1100 },
+    rule:     { s: 300,  d: 620 },
+    eyebrow:  { s: 360,  d: 560 },
+    wordFrom: 700, wordDur: 620, wordSpread: 520, wordStepMax: 105,
+    steps:    { s: 1600, d: 700, step: 160 },
+    glyph:    { lag: 90, d: 560 },
+    breathe:  { s: 3600, d: 1500 },
+  };
+
+  var S = { built: false, split: false, words: [], rows: [] };
+
+  /* Fit runs on flat text (inline-block words each report their own line box,
+     which drives _base.js's line count — and the headline — to the floor), so
+     the split happens on the first seek instead. */
+  function splitWords(node, heading) {
+    node.innerHTML = '';
+    var words = [];
+    String(heading || '').split(/\n/).forEach(function (line, li) {
+      if (li) node.appendChild(document.createElement('br'));
+      line.trim().split(/\s+/).filter(Boolean).forEach(function (w, wi) {
+        if (wi) node.appendChild(document.createTextNode(' '));
+        var span = document.createElement('span');
+        span.className = 'tl-w';
+        span.textContent = w;
+        node.appendChild(span);
+        words.push(span);
+      });
+    });
+    return words;
+  }
+
+  function ensure() {
+    if (S.split) return;
+    S.split = true;
+    S.words = S.headingEl && S.heading ? splitWords(S.headingEl, S.heading) : [];
+  }
+
+  function rise(node, t, px) {
+    if (!node) return;
+    node.style.opacity = String(t);
+    node.style.transform = 'translate3d(0,' + ((1 - t) * px) + 'px,0)';
+  }
+
+  function seek(ms) {
+    if (!S.built) return;
+    ensure();
+    var t;
+
+    /* Settles in from slightly oversized rather than blooming up from 0.80:
+       the wash's gradients are sized to their own box, so any scale under 1
+       uncovers the page colour at the frame edge. */
+    var wash = eOut(at(ms, BEAT.wash.s, BEAT.wash.d));
+    var breathe = eInOut(at(ms, BEAT.breathe.s, BEAT.breathe.d));
+    S.wash.style.opacity = String(0.22 + 0.78 * wash);
+    S.wash.style.transform = 'scale(' + (1.14 - 0.14 * wash + 0.04 * breathe) + ')';
+
+    t = eOut(at(ms, BEAT.rule.s, BEAT.rule.d));
+    S.eyebrow.style.setProperty('--tl-rule', String(t));
+    rise(S.eyebrow, eOut(at(ms, BEAT.eyebrow.s, BEAT.eyebrow.d)), 20);
+
+    var n = S.words.length;
+    var step = n > 1 ? Math.min(BEAT.wordStepMax, BEAT.wordSpread / (n - 1)) : 0;
+    for (var i = 0; i < n; i += 1) {
+      rise(S.words[i], eOut(at(ms, BEAT.wordFrom + step * i, BEAT.wordDur)), 34);
+    }
+
+    // Row by row. The glyph lands a beat after its row so the marker reads as
+    // arriving IN the row rather than as part of the same fade.
+    for (var j = 0; j < S.rows.length; j += 1) {
+      var start = BEAT.steps.s + j * BEAT.steps.step;
+      rise(S.rows[j].el, eOut(at(ms, start, BEAT.steps.d)), 30);
+      var g = eOut(at(ms, start + BEAT.glyph.lag, BEAT.glyph.d));
+      S.rows[j].marker.style.opacity = String(g);
+      S.rows[j].marker.style.transform = 'scale(' + (0.68 + 0.32 * g) + ')';
+    }
+  }
+
+  window.__pdvDuration = DUR;
+  window.__pdvSeek = seek;
+
   PDV.boot(function (d) {
     PDV.setSlot('eyebrow', d.content.eyebrow);
     PDV.setSlot('heading', d.content.heading || d.meta.title);
@@ -43,10 +180,8 @@
     var list = document.querySelector('[data-slot="steps"]');
     var steps = Array.isArray(d.content.steps) ? d.content.steps.slice(0, 5) : [];
     list.innerHTML = '';
-    if (!steps.length) {
-      list.classList.add('is-hidden');
-      return;
-    }
+    S.rows = [];
+
     steps.forEach(function (raw, i) {
       var step = typeof raw === 'string' ? { title: raw } : (raw || {});
       var li = document.createElement('li');
@@ -103,6 +238,22 @@
       li.appendChild(marker);
       li.appendChild(copy);
       list.appendChild(li);
+      S.rows.push({ el: li, marker: marker });
     });
+
+    if (!steps.length) list.classList.add('is-hidden');
+    else list.classList.remove('is-hidden');
+
+    S.headingEl = document.querySelector('[data-slot="heading"]');
+    S.heading = d.content.heading || d.meta.title || '';
+    S.wash = document.querySelector('.stage__wash');
+    S.eyebrow = document.querySelector('.eyebrow');
+
+    // A re-render through window.__render restores flat text, so the split has
+    // to happen again on the next seek.
+    S.words = [];
+    S.split = false;
+    S.built = true;
   });
+}());
 </script>

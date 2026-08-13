@@ -35,6 +35,20 @@ The recorder waits on the literal string `'true'` — `'1'` hangs until the
 Set it after `document.fonts.ready` resolves, or the first frames capture in a
 fallback face.
 
+### Which templates are seekable
+
+`title.html`, `feature.html`, `steps.html`, `outro.html` and `showcase.html`.
+Each one animates its own elements — type rising, rules drawing, glyphs
+landing, the wash blooming — with the camera dead still, so give every one of
+them `motion: { "type": "none" }`. A Ken Burns push over a scene that is
+already moving is the tell the motion was there to hide.
+
+The four card templates keep one convention `showcase.html` does not: their
+un-seeked state is the FINAL composed frame, not the empty first one. Defaults
+in CSS are the settled values and `__pdvSeek` writes the intro state on top, so
+a consumer that never seeks — the still path, `render-templates.mjs`, a human
+opening the file — still gets the designed poster rather than a blank page.
+
 ## What the recorder does
 
 `captureHtml` probes for `__pdvSeek`. When it is absent the scene is captured as

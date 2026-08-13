@@ -611,7 +611,16 @@ function assemble(a) {
   // Motion for scenes that did not get their own, alternating so no two
   // consecutive scenes make the same move.
   scenes.forEach((scene, i) => {
-    if (!scene.motion) scene.motion = kenBurns(i, brand);
+    if (!scene.motion) {
+      /* An HTML scene template animates its OWN elements — type rising, rules
+         drawing, rows landing. Pushing the camera across that as well is the
+         clearest tell of a cheap product video, and it fights motion the scene
+         is already making. Camera moves are for footage that cannot move
+         itself: a still asset, or a captured product surface. */
+      scene.motion = scene.capture?.kind === 'html'
+        ? { type: 'none' }
+        : kenBurns(i, brand);
+    }
   });
   for (let i = 1; i < scenes.length; i += 1) {
     if (JSON.stringify(scenes[i - 1].motion) !== JSON.stringify(scenes[i].motion)) continue;

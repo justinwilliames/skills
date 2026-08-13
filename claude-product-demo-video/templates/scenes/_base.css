@@ -327,19 +327,13 @@ body {
 
 .step__body { margin: 0.8rem 0 0; font-size: 2.6rem; line-height: 1.4; max-width: 36ch; text-wrap: pretty; }
 
-/* Steps carry a stagger so a reveal is possible. It is OFF unless the capture
-   opts in, because a still frame must be deterministic. */
+/* Composed by default. The staggered reveal now lives in steps.html's
+   __pdvSeek timeline, which writes inline transform/opacity per frame.
+   The old `[data-motion='on'] .step` keyframe animation is GONE on purpose: a
+   CSS animation sits above the inline-style origin in the cascade, so it would
+   silently override every value the seek writes — and it ran on the wall clock,
+   which makes a captured frame non-deterministic either way. */
 .step { opacity: 1; transform: none; }
-
-[data-motion='on'] .step {
-  animation: pdv-rise 620ms cubic-bezier(0.22, 0.61, 0.36, 1) both;
-  animation-delay: calc(var(--i, 0) * 130ms);
-}
-
-@keyframes pdv-rise {
-  from { opacity: 0; transform: translateY(3.2rem); }
-  to   { opacity: 1; transform: none; }
-}
 
 /* ── quote ─────────────────────────────────────────────────────────────── */
 

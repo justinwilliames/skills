@@ -1,7 +1,7 @@
 <meta charset="utf-8">
 <title>pdv scene — title</title>
 <!--
-  Title card.
+  Title card, as a seekable timeline.
 
   scene.content:
     eyebrow     short kicker above the headline  (default: brand.name)
@@ -10,6 +10,23 @@
 
   One idea, set large. The headline is the only thing on this frame that is
   allowed to be long.
+
+  Exposes the seekable contract (docs/SEEKABLE-SCENES.md):
+    window.__pdvDuration = 5000
+    window.__pdvSeek(ms)   pure with respect to time — no wall clock anywhere.
+
+  THE CAMERA IS INTENTIONALLY STATIC. This scene animates its own elements —
+  the rule draws, the eyebrow and headline rise word by word, the wash blooms —
+  so a Ken Burns push on top of it is redundant and reads as the cheap tell it
+  is. Give this scene `motion: { "type": "none" }` in the storyboard.
+
+  Nothing here animates layout: only `transform` and `opacity` are written, and
+  the words are inline-block so a transform on one cannot reflow its neighbours.
+
+  The un-seeked page is the FINAL composed frame, not the empty first one. A
+  consumer that never calls __pdvSeek (the still path in capture.mjs, the
+  render-templates harness, a human opening the file) still gets the designed
+  poster; the intro state only exists once the timeline is driven.
 -->
 <link rel="stylesheet" href="_base.css">
 <script src="_base.js"></script>
@@ -37,13 +54,152 @@
      bottom-left furniture — which it did, hiding the wordmark on the title card
      of the first cut. Bottom edge stays clear; top edge is free. */
   .stage__content--with-edge { padding-top: 16rem; }
+
+  /* ── timeline surfaces ─────────────────────────────────────────────────
+     Every default below is the COMPOSED value, so the frame is correct before
+     the first seek and identical to the pre-timeline design at the end of it. */
+
+  [data-scene='title'] .stage__wash,
+  [data-scene='title'] .eyebrow,
+  [data-scene='title'] .lede,
+  [data-scene='title'] .logo { will-change: transform, opacity; }
+
+  /* The rule draws along its length. It is a flex item, so scaling it leaves
+     its 5.6rem box — and therefore the eyebrow's text position — untouched. */
+  [data-scene='title'] .eyebrow--rule::before {
+    transform: scaleX(var(--tl-rule, 1));
+    transform-origin: left center;
+  }
+
+  /* Headline words. No padding: an inline-block's box feeds the line box, and
+     .display is set at line-height 1.04 where any vertical padding would open
+     the leading back up. */
+  [data-scene='title'] .tl-w { display: inline-block; will-change: transform, opacity; }
 </style>
 
 <script>
+(function () {
+  'use strict';
+
+  var DUR = 5000;
+
+  /* ── easing ─────────────────────────────────────────────────────────────
+     One place for the curves; every beat is a normalised t off `at`. `at`
+     clamps, so a seek past the end holds the final state rather than
+     overshooting — which is what the recorder needs when narration outruns
+     the declared duration. */
+
+  function at(ms, start, dur) {
+    if (dur <= 0) return ms >= start ? 1 : 0;
+    return Math.max(0, Math.min(1, (ms - start) / dur));
+  }
+  function eOut(t) { return 1 - Math.pow(1 - t, 3); }
+  function eInOut(t) { return t < 0.5 ? 4 * t * t * t : 1 - Math.pow(-2 * t + 2, 3) / 2; }
+
+  /* ── the timeline ───────────────────────────────────────────────────────
+     Beats overlap on purpose: strictly sequential motion reads as a slideshow
+     of moves. The last motion ends at 4200ms, so the final 800ms holds. */
+
+  var BEAT = {
+    wash:     { s: 0,    d: 1100 },
+    logo:     { s: 240,  d: 640 },
+    rule:     { s: 400,  d: 620 },
+    eyebrow:  { s: 460,  d: 560 },
+    wordFrom: 800, wordDur: 640, wordSpread: 560, wordStepMax: 110,
+    sub:      { s: 1620, d: 720 },
+    breathe:  { s: 3000, d: 1200 },
+  };
+
+  var S = { built: false, split: false, words: [] };
+
+  /* ── word split ─────────────────────────────────────────────────────────
+     The headline is set as PLAIN text by setSlot first, because _base.js's fit
+     routine counts line boxes off Range rects and inline-block words report
+     their own boxes — the count comes back as one line per word, which drives
+     the headline straight to the fit floor. So fit runs on flat text and the
+     split happens on the first seek, after fonts have settled and the final
+     font-size is already inline on the element. */
+
+  function splitWords(node, heading) {
+    node.innerHTML = '';
+    var words = [];
+    String(heading || '').split(/\n/).forEach(function (line, li) {
+      if (li) node.appendChild(document.createElement('br'));
+      line.trim().split(/\s+/).filter(Boolean).forEach(function (w, wi) {
+        if (wi) node.appendChild(document.createTextNode(' '));
+        var span = document.createElement('span');
+        span.className = 'tl-w';
+        span.textContent = w;
+        node.appendChild(span);
+        words.push(span);
+      });
+    });
+    return words;
+  }
+
+  function ensure() {
+    if (S.split) return;
+    S.split = true;
+    S.words = S.headingEl && S.heading ? splitWords(S.headingEl, S.heading) : [];
+  }
+
+  /** Type arrives by rising and fading. Never by scaling, never sideways. */
+  function rise(node, t, px) {
+    if (!node) return;
+    node.style.opacity = String(t);
+    node.style.transform = 'translate3d(0,' + ((1 - t) * px) + 'px,0)';
+  }
+
+  function seek(ms) {
+    if (!S.built) return;
+    ensure();
+    var t;
+
+    /* The wash settles INTO place from slightly oversized rather than blooming
+       up from 0.80. Its gradients are sized to their own box, so any scale
+       below 1 uncovers the page colour at the frame edge and puts a readable
+       rectangle in the corner. Down-easing keeps the bloom and cannot seam. */
+    var wash = eOut(at(ms, BEAT.wash.s, BEAT.wash.d));
+    var breathe = eInOut(at(ms, BEAT.breathe.s, BEAT.breathe.d));
+    S.wash.style.opacity = String(0.22 + 0.78 * wash);
+    S.wash.style.transform = 'scale(' + (1.14 - 0.14 * wash + 0.04 * breathe) + ')';
+
+    rise(S.logo, eOut(at(ms, BEAT.logo.s, BEAT.logo.d)), 18);
+
+    t = eOut(at(ms, BEAT.rule.s, BEAT.rule.d));
+    S.eyebrow.style.setProperty('--tl-rule', String(t));
+    rise(S.eyebrow, eOut(at(ms, BEAT.eyebrow.s, BEAT.eyebrow.d)), 20);
+
+    var n = S.words.length;
+    var step = n > 1 ? Math.min(BEAT.wordStepMax, BEAT.wordSpread / (n - 1)) : 0;
+    for (var i = 0; i < n; i += 1) {
+      rise(S.words[i], eOut(at(ms, BEAT.wordFrom + step * i, BEAT.wordDur)), 40);
+    }
+
+    rise(S.sub, eOut(at(ms, BEAT.sub.s, BEAT.sub.d)), 24);
+  }
+
+  window.__pdvDuration = DUR;
+  window.__pdvSeek = seek;
+
   PDV.boot(function (d) {
     PDV.setSlot('eyebrow', d.content.eyebrow || d.brand.name);
     PDV.setSlot('heading', d.content.heading || d.meta.title);
     PDV.setSlot('subheading', d.content.subheading || d.content.body || d.meta.subtitle);
     PDV.setLogo('logo', d.brand, d.meta);
+
+    S.headingEl = document.querySelector('[data-slot="heading"]');
+    S.heading = d.content.heading || d.meta.title || '';
+    S.wash = document.querySelector('.stage__wash');
+    S.eyebrow = document.querySelector('.eyebrow');
+    S.sub = document.querySelector('[data-slot="subheading"]');
+    S.logo = document.querySelector('.edge--top .logo');
+
+    // A re-render through window.__render puts flat text back in the heading,
+    // so the split has to happen again on the next seek.
+    S.words = [];
+    S.split = false;
+    S.built = true;
   });
+}());
 </script>

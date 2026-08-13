@@ -1,7 +1,7 @@
 <meta charset="utf-8">
 <title>pdv scene — outro</title>
 <!--
-  Outro card.
+  Outro card, as a seekable timeline.
 
   scene.content:
     cta         one line telling the viewer what to do next
@@ -14,7 +14,20 @@
   headline — small is not an excuse for unreadable.
 
   Give this scene a fixed duration of at least 3s; an outro that cuts before
-  the URL can be read is the same as no outro.
+  the URL can be read is the same as no outro. The timeline below is 5s and
+  the URL is fully landed by 2.4s, so a shorter cut still shows it.
+
+  Exposes the seekable contract (docs/SEEKABLE-SCENES.md):
+    window.__pdvDuration = 5000
+    window.__pdvSeek(ms)   pure with respect to time — no wall clock anywhere.
+
+  THE CAMERA IS INTENTIONALLY STATIC. The logo rises, the call to action lands
+  word by word, the URL follows and the legal lines settle last — the scene
+  animates itself, so a Ken Burns push on the last frame of the film is exactly
+  the cheap tell to avoid. Give this scene `motion: { "type": "none" }`.
+
+  Only `transform` and `opacity` are ever written. The un-seeked page is the
+  FINAL composed frame, so a consumer that never seeks still gets the poster.
 -->
 <link rel="stylesheet" href="_base.css">
 <script src="_base.js"></script>
@@ -44,9 +57,115 @@
   .outro__copy { text-align: center; }
   .outro__copy > * { margin-left: auto; margin-right: auto; }
   .edge--legal { justify-content: center; }
+
+  /* ── timeline surfaces ─────────────────────────────────────────────────
+     Every default is the COMPOSED value: correct before the first seek and
+     identical to the pre-timeline design at the end of it. */
+
+  [data-scene='outro'] .stage__wash,
+  [data-scene='outro'] .logo--hero,
+  [data-scene='outro'] .outro__url,
+  [data-scene='outro'] .legal { will-change: transform, opacity; }
+
+  [data-scene='outro'] .tl-w { display: inline-block; will-change: transform, opacity; }
 </style>
 
 <script>
+(function () {
+  'use strict';
+
+  var DUR = 5000;
+
+  /* ── easing ─────────────────────────────────────────────────────────────
+     `at` clamps, so a seek past the declared duration holds the final state
+     rather than overshooting — what the recorder needs when narration runs
+     longer than the timeline. */
+
+  function at(ms, start, dur) {
+    if (dur <= 0) return ms >= start ? 1 : 0;
+    return Math.max(0, Math.min(1, (ms - start) / dur));
+  }
+  function eOut(t) { return 1 - Math.pow(1 - t, 3); }
+  function eInOut(t) { return t < 0.5 ? 4 * t * t * t : 1 - Math.pow(-2 * t + 2, 3) / 2; }
+
+  /* ── the timeline ───────────────────────────────────────────────────────
+     Last motion ends at 4100ms of 5000, so the final 900ms is a dead-still
+     hold on the URL — which is the one frame of the film a viewer is actually
+     asked to read. */
+
+  var BEAT = {
+    wash:     { s: 0,    d: 1100 },
+    logo:     { s: 280,  d: 760 },
+    wordFrom: 900, wordDur: 620, wordSpread: 480, wordStepMax: 110,
+    url:      { s: 1720, d: 680 },
+    legal:    { s: 2100, d: 620, step: 140 },
+    breathe:  { s: 2900, d: 1200 },
+  };
+
+  var S = { built: false, split: false, words: [], legal: [] };
+
+  /* Fit runs on flat text (inline-block words each report their own line box,
+     which drives _base.js's line count — and the line size — to the floor), so
+     the split happens on the first seek instead. */
+  function splitWords(node, text) {
+    node.innerHTML = '';
+    var words = [];
+    String(text || '').split(/\n/).forEach(function (line, li) {
+      if (li) node.appendChild(document.createElement('br'));
+      line.trim().split(/\s+/).filter(Boolean).forEach(function (w, wi) {
+        if (wi) node.appendChild(document.createTextNode(' '));
+        var span = document.createElement('span');
+        span.className = 'tl-w';
+        span.textContent = w;
+        node.appendChild(span);
+        words.push(span);
+      });
+    });
+    return words;
+  }
+
+  function ensure() {
+    if (S.split) return;
+    S.split = true;
+    S.words = S.ctaEl && S.cta ? splitWords(S.ctaEl, S.cta) : [];
+  }
+
+  function rise(node, t, px) {
+    if (!node) return;
+    node.style.opacity = String(t);
+    node.style.transform = 'translate3d(0,' + ((1 - t) * px) + 'px,0)';
+  }
+
+  function seek(ms) {
+    if (!S.built) return;
+    ensure();
+
+    /* Settles in from slightly oversized rather than blooming up from 0.80:
+       the wash's gradients are sized to their own box, so any scale under 1
+       uncovers the page colour at the frame edge. */
+    var wash = eOut(at(ms, BEAT.wash.s, BEAT.wash.d));
+    var breathe = eInOut(at(ms, BEAT.breathe.s, BEAT.breathe.d));
+    S.wash.style.opacity = String(0.22 + 0.78 * wash);
+    S.wash.style.transform = 'scale(' + (1.14 - 0.14 * wash + 0.04 * breathe) + ')';
+
+    rise(S.logo, eOut(at(ms, BEAT.logo.s, BEAT.logo.d)), 22);
+
+    var n = S.words.length;
+    var step = n > 1 ? Math.min(BEAT.wordStepMax, BEAT.wordSpread / (n - 1)) : 0;
+    for (var i = 0; i < n; i += 1) {
+      rise(S.words[i], eOut(at(ms, BEAT.wordFrom + step * i, BEAT.wordDur)), 30);
+    }
+
+    rise(S.url, eOut(at(ms, BEAT.url.s, BEAT.url.d)), 22);
+
+    for (var j = 0; j < S.legal.length; j += 1) {
+      rise(S.legal[j], eOut(at(ms, BEAT.legal.s + j * BEAT.legal.step, BEAT.legal.d)), 16);
+    }
+  }
+
+  window.__pdvDuration = DUR;
+  window.__pdvSeek = seek;
+
   PDV.boot(function (d) {
     var legal = d.brand.legal || {};
     PDV.setLogo('logo', d.brand, d.meta);
@@ -60,5 +179,19 @@
           || 'Product footage is a demo build reconstructed from the repository, not a recording of production.')
         : ''
     );
+
+    S.ctaEl = document.querySelector('[data-slot="cta"]');
+    S.cta = d.content.cta || d.brand.tagline || '';
+    S.wash = document.querySelector('.stage__wash');
+    S.logo = document.querySelector('.logo--hero');
+    S.url = document.querySelector('[data-slot="url"]');
+    S.legal = [].slice.call(document.querySelectorAll('.outro__legal .legal'));
+
+    // A re-render through window.__render restores flat text, so the split has
+    // to happen again on the next seek.
+    S.words = [];
+    S.split = false;
+    S.built = true;
   });
+}());
 </script>
