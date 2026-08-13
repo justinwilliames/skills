@@ -518,8 +518,10 @@ function makeDriver({ page, demoFrame, hasRuntime, meta, viewport }) {
  *
  * Returns { frameCount, durationMs, resolvedTargets }.
  */
-async function recordFlow(page, { flow, meta, framesDir, driver, log, debug, mask }) {
-  const surface = page.frameLocator('#pdv-frame');
+async function recordFlow(page, { flow, meta, framesDir, driver, log, debug, mask, surface: surfaceIn }) {
+  // A url scene whose target refuses framing is driven on the page itself;
+  // only the shell path has an iframe to reach into.
+  const surface = surfaceIn ?? page.frameLocator('#pdv-frame');
   const plan = planFlow(flow, meta.fps);
   const resolvedTargets = {};
 
@@ -695,9 +697,20 @@ export async function run(ctx) {
   const scenesRoot = await ensureDir(join(ctx.work, 'scenes'));
   const manifest = {};
 
-  const browser = await chromium.launch({
-    args: ['--force-color-profile=srgb', '--font-render-hinting=none', '--disable-lcd-text'],
-  });
+  // Attaching to a browser the operator is already signed into beats every
+  // scheme for handing credentials to the recorder: nothing is typed, nothing
+  // is stored, and the session is exactly the one they use. Start Chrome with
+  // --remote-debugging-port=9222 and pass --cdp.
+  const cdp = ctx.cdp === true ? 'http://127.0.0.1:9222' : ctx.cdp;
+  const browser = cdp
+    ? await chromium.connectOverCDP(String(cdp)).then((b) => {
+        ctx.log(`capture: attached to the running browser at ${cdp}`);
+        return b;
+      })
+    : await chromium.launch({
+        args: ['--force-color-profile=srgb', '--font-render-hinting=none', '--disable-lcd-text'],
+      });
+  const ownsBrowser = !cdp;
 
   try {
     for (const scene of storyboard.scenes) {
@@ -719,7 +732,9 @@ export async function run(ctx) {
       manifest[scene.id] = manifestEntry(kind, entry, meta);
     }
   } finally {
-    await browser.close();
+    // Never close a browser we did not open — that would kill the operator's
+    // own Chrome session mid-run.
+    if (ownsBrowser) await browser.close();
   }
 
   const manifestPath = join(ctx.work, 'capture-manifest.json');
@@ -789,6 +804,31 @@ async function captureHtml({ browser, brand, tokens, meta, scene, sceneDir, font
     await page.addStyleTag({ content: DETERMINISM_CSS });
     const resolvedTargets = {};
     await resolveMotionTarget(page, scene, resolvedTargets);
+
+    // A template that exposes __pdvSeek is a timeline, not a poster: evaluate it
+    // at each frame instead of screenshotting one moment. See docs/SEEKABLE-SCENES.md.
+    const seekable = await page.evaluate(() => typeof window.__pdvSeek === 'function');
+    if (seekable) {
+      const declared = await page.evaluate(() => Number(window.__pdvDuration) || 0);
+      const durationMs = Number(scene.durationMs) || declared || 6000;
+      const frames = Math.max(1, Math.round((durationMs / 1000) * meta.fps));
+      const framesDir = await ensureDir(join(sceneDir, 'frames'));
+      ctx.log(`    seekable timeline: ${frames} frames over ${durationMs}ms`);
+
+      for (let i = 0; i < frames; i += 1) {
+        await page.evaluate((ms) => window.__pdvSeek(ms), (i / meta.fps) * 1000);
+        await shot(page, join(framesDir, `${pad6(i)}.png`));
+      }
+      return {
+        framesDir,
+        framePattern: join(framesDir, '%06d.png'),
+        frameCount: frames,
+        durationMs,
+        geometryKind: 'frames',
+        resolvedTargets,
+      };
+    }
+
     const stillPath = join(sceneDir, 'still.png');
     await shot(page, stillPath);
     return { stillPath, geometryKind: 'still', durationMs: scene.durationMs ?? null, resolvedTargets };
@@ -1073,6 +1113,29 @@ function assertPiiAcknowledged(scene) {
   );
 }
 
+
+/**
+ * Does this origin permit being embedded in an iframe?
+ *
+ * Checked with a real request rather than assumed, because the answer decides
+ * whether the browser-frame shell is usable at all. A network failure is
+ * treated as "no": full-bleed capture always works, a blocked frame never does.
+ */
+export async function allowsFraming(url, ctx = {}) {
+  try {
+    const res = await fetch(url, { method: 'HEAD', redirect: 'follow' });
+    const xfo = (res.headers.get('x-frame-options') ?? '').toLowerCase();
+    if (xfo.includes('deny') || xfo.includes('sameorigin')) return false;
+    const csp = (res.headers.get('content-security-policy') ?? '').toLowerCase();
+    const fa = /frame-ancestors([^;]*)/.exec(csp);
+    if (fa && !/\*|http/.test(fa[1])) return false;
+    return true;
+  } catch (err) {
+    ctx.debug?.(`framing probe failed for ${url}: ${err.message}`);
+    return false;
+  }
+}
+
 async function captureUrl({ browser, brand, tokens, meta, scene, sceneDir, fontCss, ctx }) {
   const pii = assertPiiAcknowledged(scene);
   const auth = scene.capture.auth ?? {};
@@ -1087,14 +1150,41 @@ async function captureUrl({ browser, brand, tokens, meta, scene, sceneDir, fontC
   const record = scene.capture.record === true;
   if (record) contextExtra.recordVideo = { dir: sceneDir, size: { width: meta.width, height: meta.height } };
 
-  const chrome = scene.capture.chrome !== false;
-  const { server, context, page } = await withShell({
-    browser, brand, tokens, meta, scene, sceneDir, fontCss,
-    targetUrl: scene.capture.url, viewport: DEFAULT_DEMO_VIEWPORT, chrome, contextExtra,
-  });
+  // The browser-chrome shell renders the target inside an iframe, which every
+  // real product refuses: app servers send X-Frame-Options: DENY or a CSP
+  // frame-ancestors rule precisely to stop being embedded. Probe first and
+  // navigate directly when framing is refused, rather than waiting 15s for a
+  // selector inside a frame that was never allowed to load.
+  const framingAllowed = await allowsFraming(scene.capture.url, ctx);
+  const chrome = scene.capture.chrome !== false && framingAllowed;
+  if (scene.capture.chrome !== false && !framingAllowed) {
+    ctx.log(`  ${scene.id}: target refuses framing — recording the page full-bleed, without the browser frame`);
+  }
+
+  const { server, context, page } = chrome
+    ? await withShell({
+        browser, brand, tokens, meta, scene, sceneDir, fontCss,
+        targetUrl: scene.capture.url, viewport: DEFAULT_DEMO_VIEWPORT, chrome, contextExtra,
+      })
+    : await (async () => {
+        const c = await browser.newContext({
+          viewport: { width: meta.width, height: meta.height },
+          deviceScaleFactor: CAPTURE_SCALE,
+          ...contextExtra,
+        });
+        const pg = await c.newPage();
+        await pg.goto(scene.capture.url, { waitUntil: 'domcontentloaded', timeout: 45000 });
+        return { server: { close: async () => {} }, context: c, page: pg };
+      })();
+
   try {
-    const surface = page.frameLocator('#pdv-frame');
-    await page.frames().find((f) => f !== page.mainFrame())?.waitForLoadState('load');
+    // With no shell there is no iframe: the page itself is the surface.
+    const surface = chrome ? page.frameLocator('#pdv-frame') : page;
+    if (chrome) {
+      await page.frames().find((f) => f !== page.mainFrame())?.waitForLoadState('load');
+    } else {
+      await page.waitForLoadState('networkidle', { timeout: 30000 }).catch(() => {});
+    }
     await killTransitions(page);
     // Redact before anything is captured, and again after each step, because a
     // click can re-render the very node that was just sanitised.
@@ -1125,7 +1215,7 @@ async function captureUrl({ browser, brand, tokens, meta, scene, sceneDir, fontC
     const flow = (scene.capture.steps ?? []).map((s) => ({ ...s, value: resolveStepValue(s.value, auth) }));
     if (flow.length) {
       const driver = makeDriver({ page, demoFrame: null, hasRuntime: false, meta, viewport: DEFAULT_DEMO_VIEWPORT });
-      const result = await recordFlow(page, { flow, meta, framesDir, driver, log: ctx.log, debug: ctx.debug, mask: maskLocators });
+      const result = await recordFlow(page, { flow, meta, framesDir, driver, log: ctx.log, debug: ctx.debug, mask: maskLocators, surface });
       await resolveMotionTarget(surface, scene, result.resolvedTargets);
       return {
         framesDir,

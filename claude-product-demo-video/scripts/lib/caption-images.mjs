@@ -22,14 +22,23 @@ import { existsSync } from 'node:fs';
 
 import { contrastRatio } from './util.mjs';
 
-/** Caption band geometry as a fraction of frame height. */
+/**
+ * Caption band geometry as a fraction of frame height.
+ *
+ * These were measured, not guessed. The first pass used 0.0324 (35px at 1080p)
+ * with loose padding, which produced a band 120px tall — 11% of the frame and
+ * up to 80% of its width. That is roughly double a broadcast burn-in and it
+ * covers the product UI the caption is describing. A single line now lands
+ * near 4-5% of frame height, which is where subtitles are supposed to sit.
+ */
 const BAND = {
-  fontRatio: 0.0324, // ~35px at 1080p — legible on a phone, not shouty on a TV
-  lineHeight: 1.28,
-  paddingXRatio: 0.62, // of font size
-  paddingYRatio: 0.42,
-  bottomMarginRatio: 0.072,
-  radiusRatio: 0.28,
+  fontRatio: 0.024, // ~26px at 1080p
+  lineHeight: 1.22,
+  paddingXRatio: 0.5, // of font size
+  paddingYRatio: 0.26,
+  bottomMarginRatio: 0.062,
+  radiusRatio: 0.3,
+  maxWidthRatio: 0.66, // of frame width
 };
 
 async function fontFaceCss(brand, brandDir) {
@@ -127,7 +136,7 @@ export async function renderCaptionImages(cues, { brand, brandDir, meta, outDir,
            ${barCss}
            border-radius:${radius}px;
            padding:${padY}px ${padX}px;
-           max-width:${Math.round(width * 0.78)}px;
+           max-width:${Math.round(width * BAND.maxWidthRatio)}px;
            font-family:${stack};
            font-weight:${brand.type?.body?.weight ?? 500};
            font-size:${fontPx}px;

@@ -58,6 +58,7 @@ const OPTIONS = {
   force: { type: 'boolean', default: false },
   yes: { type: 'boolean', default: false },
   install: { type: 'boolean', default: false },
+  cdp: { type: 'string' },
   verbose: { type: 'boolean', short: 'v', default: false },
   help: { type: 'boolean', short: 'h', default: false },
 };
@@ -123,6 +124,8 @@ function usage() {
       `  --force               re-run even when output looks fresh\n` +
       `  --yes                 accept intake defaults without prompting\n` +
       `  --install             provision missing tooling automatically\n` +
+      `  --cdp [endpoint]      attach to a browser you are already signed into\n` +
+      `                        (start Chrome with --remote-debugging-port=9222)\n` +
       `  -v, --verbose         log every external command\n`,
   );
 }

@@ -168,12 +168,19 @@ function renderCards(el) {
   const items = (el.items ?? [])
     .map(
       (it) =>
-        `<div class="pdv-card pdv-card--tile"${attr('id', it.id)}>` +
+        `<div class="pdv-card pdv-card--tile"${attr('id', it.id)}${jsonAttr('data-when', it.when)}>` +
         (it.icon ? `<div class="pdv-tile__icon">${icon(it.icon)}</div>` : '') +
-        (it.badge ? `<span class="pdv-badge pdv-badge--${esc(it.badgeTone ?? 'neutral')}">${esc(it.badge)}</span>` : '') +
+        (it.badge
+          ? `<span class="pdv-badge pdv-badge--${esc(it.badgeTone ?? 'neutral')}"${jsonAttr('data-when', it.badgeWhen)}>${esc(it.badge)}</span>`
+          : '') +
         `<div class="pdv-tile__title">${esc(it.title)}</div>` +
         (it.body ? `<div class="pdv-muted">${esc(it.body)}</div>` : '') +
         (it.meta ? `<div class="pdv-tile__meta">${esc(it.meta)}</div>` : '') +
+        // Real product cards carry their own action — an integration tile with
+        // its Connect button sitting outside it is a different component.
+        (it.actions?.length
+          ? `<div class="pdv-tile__actions">${it.actions.map(renderButton).join('')}</div>`
+          : '') +
         `</div>`,
     )
     .join('');
@@ -515,6 +522,8 @@ button { font: inherit; color: inherit; }
 .pdv-heading p { margin-top: 3px; font-size: 14px; }
 .pdv-row { display: flex; align-items: center; gap: 12px; flex-wrap: wrap; }
 .pdv-spacer { flex: 1 1 auto; }
+.pdv-card--tile { display: flex; flex-direction: column; gap: 8px; align-items: flex-start; }
+.pdv-tile__actions { margin-top: auto; padding-top: 14px; display: flex; gap: 8px; align-self: flex-end; }
 .pdv-divider { border: 0; border-top: 1px solid var(--pdv-color-border); margin: 4px 0; }
 
 .pdv-card {
@@ -1007,7 +1016,26 @@ export async function buildFromSpec(spec, outDir, brand, opts = {}) {
   const source = specPath ?? '(inline spec)';
   validateSpec(parsed, source);
 
-  const resolved = resolveBrandObject(brand, { source: opts.brandSource ?? '(brand object)' });
+  /* A product surface is usually NOT styled like the marketing site. Measuring
+     one real app found a different display face, a different page background
+     and fully-rounded buttons where the marketing site used 8px — so a demo
+     built from marketing tokens looks subtly wrong to anyone who uses the
+     product. `spec.theme` overrides the brand for this surface only, and is
+     meant to be filled from measured computed styles rather than guessed. */
+  const themed = parsed.theme
+    ? {
+        ...brand,
+        color: { ...brand.color, ...(parsed.theme.color ?? {}) },
+        type: {
+          ...brand.type,
+          display: { ...brand.type?.display, ...(parsed.theme.type?.display ?? {}) },
+          body: { ...brand.type?.body, ...(parsed.theme.type?.body ?? {}) },
+        },
+        shape: { ...brand.shape, ...(parsed.theme.shape ?? {}) },
+      }
+    : brand;
+
+  const resolved = resolveBrandObject(themed, { source: opts.brandSource ?? '(brand object)' });
   const dir = resolve(opts.cwd ?? process.cwd(), outDir);
   await ensureDir(dir);
 
