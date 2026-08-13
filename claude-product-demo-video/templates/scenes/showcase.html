@@ -116,11 +116,6 @@
       </g>
     </svg>
 
-    <div class="sc__orb">
-      <div class="sc__orbhalo"></div>
-      <div class="sc__orbdisc" data-slot="orb"></div>
-    </div>
-
     <div class="sc__chip">
       <span class="sc__chipglyph" data-slot="chipGlyph"></span>
       <em data-ink="text" data-slot="chipLabel"></em>
@@ -865,10 +860,12 @@
     var orbC = { x: (mA.x + mB.x) / 2, y: (mA.y + mB.y) / 2 };
     var chipC = { x: (aS.x + bE.x) / 2, y: Math.min(aS.y, bE.y) - 28 };
 
-    S.orb.style.left = (orbC.x / 1920 * 100) + '%';
-    S.orb.style.top = (orbC.y / 1080 * 100) + '%';
-    S.orb.style.marginLeft = '-9rem';
-    S.orb.style.marginTop = '-9rem';
+    if (S.orb) {
+      S.orb.style.left = (orbC.x / 1920 * 100) + '%';
+      S.orb.style.top = (orbC.y / 1080 * 100) + '%';
+      S.orb.style.marginLeft = '-9rem';
+      S.orb.style.marginTop = '-9rem';
+    }
     S.chip.style.left = (chipC.x / 1920 * 100) + '%';
     S.chip.style.top = (chipC.y / 1080 * 100) + '%';
 
@@ -909,9 +906,11 @@
       g.style.transform = 'scale(' + (0.80 + 0.20 * gIn + 0.045 * breathe) + ')';
     });
 
-    t = eOut(at(ms, BEAT.orb.s, BEAT.orb.d));
-    S.orb.style.opacity = String(t);
-    S.orb.style.transform = 'scale(' + (0.84 + 0.16 * t + 0.035 * breathe) + ')';
+    if (S.orb) {
+      t = eOut(at(ms, BEAT.orb.s, BEAT.orb.d));
+      S.orb.style.opacity = String(t);
+      S.orb.style.transform = 'scale(' + (0.84 + 0.16 * t + 0.035 * breathe) + ')';
+    }
 
     t = eOut(at(ms, BEAT.logo.s, BEAT.logo.d));
     S.logo.style.opacity = String(t);
@@ -1046,8 +1045,15 @@
     S.cards.forEach(function (card) { if (!S.flip && card.badge && card.badge.flips) S.flip = card.badge; });
 
     var motif = (d.brand && d.brand.assets && d.brand.assets.motif) || {};
-    mountOrb(document.querySelector('[data-slot="orb"]'),
-      motif.orbLight ? PDV.resolveUrl(motif.orbLight, d.meta && d.meta.brandDir) : null);
+    /* The orb is deliberately absent from this scene. Every orb asset is matted
+       against a background and none has soft alpha, so it can only sit on a white
+       bed — and a white disc with an orb inside it reads as a disc, not as the
+       orb (Justin, 13 Aug 2026). Re-enable by restoring the .sc__orb markup once
+       a vector or soft-alpha master exists. */
+    var orbSlot = document.querySelector('[data-slot="orb"]');
+    if (orbSlot) {
+      mountOrb(orbSlot, motif.orbLight ? PDV.resolveUrl(motif.orbLight, d.meta && d.meta.brandDir) : null);
+    }
 
     S.glows = [].slice.call(document.querySelectorAll('.sc__glow'));
     S.orb = document.querySelector('.sc__orb');
