@@ -330,6 +330,20 @@
         "guidelinesDoc": {
           "type": "string",
           "description": "Path/URL to the brand guidelines the intake was filled from. Recorded for provenance."
+        },
+        "glyphs": {
+          "type": "object",
+          "description": "Named icon files from the brand's own icon family, keyed by role (tick, phone, calendar...). Scene templates use these instead of drawing generic markers, which is the difference between a video that matches the product and one that merely borrows its colours. Referenced from scene content as \"glyph\": \"tick\".",
+          "additionalProperties": {
+            "type": "string"
+          }
+        },
+        "motif": {
+          "type": "object",
+          "description": "Signature brand devices - an animated mark, a presence indicator, a recurring shape. Used sparingly: a motif in every scene stops reading as a signature.",
+          "additionalProperties": {
+            "type": "string"
+          }
         }
       }
     },

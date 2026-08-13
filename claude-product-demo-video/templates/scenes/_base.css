@@ -291,7 +291,21 @@ body {
   border-radius: 50%;
   display: grid;
   place-items: center;
+  /* Transparent by default: a brand glyph usually carries its own shape and
+     fill, and painting a primary disc behind it double-stacks the container.
+     The numeral fallback opts the disc back in. */
+  background: transparent;
+}
+
+.step__marker--filled {
   background: var(--pdv-color-primary, #2f5bea);
+}
+
+.step__glyph {
+  width: 100%;
+  height: 100%;
+  object-fit: contain;
+  display: block;
 }
 
 .step__marker span {

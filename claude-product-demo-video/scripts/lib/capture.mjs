@@ -223,6 +223,15 @@ export async function embedBrandImages(brand, { cwd = process.cwd(), log } = {})
   if (out.assets?.watermark) {
     out.assets.watermark = await inline(out.assets.watermark, 'assets.watermark');
   }
+  // Glyphs and motifs are referenced by scene templates the same way logos are,
+  // so they need the same treatment or they 404 against the template directory.
+  for (const group of ['glyphs', 'motif']) {
+    const map = out.assets?.[group];
+    if (!map) continue;
+    for (const [key, value] of Object.entries(map)) {
+      map[key] = await inline(value, `assets.${group}.${key}`);
+    }
+  }
   return out;
 }
 

@@ -55,10 +55,35 @@
 
       var marker = document.createElement('span');
       marker.className = 'step__marker';
-      var markerNumber = document.createElement('span');
-      markerNumber.setAttribute('data-ink', 'onPrimary');
-      markerNumber.textContent = String(i + 1);
-      marker.appendChild(markerNumber);
+
+      // A brand that ships its own icon family should use it. A drawn numeral
+      // is the fallback for brands that have none, not the house style — the
+      // real glyph is most of what makes a frame read as the product's own.
+      var glyphs = (d.brand && d.brand.assets && d.brand.assets.glyphs) || {};
+      var glyphSrc = step.glyph && glyphs[step.glyph];
+
+      if (glyphSrc) {
+        var img = document.createElement('img');
+        img.className = 'step__glyph';
+        img.alt = '';
+        img.addEventListener('error', function () {
+          // A missing glyph must not leave an empty marker.
+          img.remove();
+          marker.classList.add('step__marker--filled');
+          var n = document.createElement('span');
+          n.setAttribute('data-ink', 'onPrimary');
+          n.textContent = String(i + 1);
+          marker.appendChild(n);
+        });
+        img.src = PDV.resolveUrl(glyphSrc, d.meta && d.meta.brandDir);
+        marker.appendChild(img);
+      } else {
+        marker.classList.add('step__marker--filled');
+        var markerNumber = document.createElement('span');
+        markerNumber.setAttribute('data-ink', 'onPrimary');
+        markerNumber.textContent = String(i + 1);
+        marker.appendChild(markerNumber);
+      }
 
       var copy = document.createElement('div');
       var title = document.createElement('p');
