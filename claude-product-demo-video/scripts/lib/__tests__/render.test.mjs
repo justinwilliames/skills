@@ -113,9 +113,36 @@ function round3(n) {
 // durations & timing
 // ---------------------------------------------------------------------------
 
-test('resolveSceneDurations: explicit durationMs wins over voiceover length', () => {
-  const [d] = resolveSceneDurations([{ id: 'a', durationMs: 2500 }], { voDurations: { a: 9 } });
-  assert.equal(d.durationSec, 2.5);
+test('resolveSceneDurations: explicit durationMs wins when it clears the narration', () => {
+  const [d] = resolveSceneDurations([{ id: 'a', durationMs: 9000 }], { voDurations: { a: 3 } });
+  assert.equal(d.durationSec, 9);
+  assert.equal(d.extendedForSpeech, false);
+});
+
+test('resolveSceneDurations: an explicit duration is a FLOOR, never a ceiling over its own VO', () => {
+  // This test previously asserted the opposite, and that assertion WAS the bug:
+  // VO is laid down at the scene start and plays to its full length, so a scene
+  // shorter than its narration runs that narration under the NEXT scene's and
+  // two voices talk at once. Observed on a real cut: 7.00s scene, 8.78s take,
+  // 2.48s of overlap.
+  const [d] = resolveSceneDurations([{ id: 'a', durationMs: 7000 }], {
+    voDurations: { a: 8.78 },
+    padSec: 0.8,
+  });
+  assert.equal(round3(d.durationSec), 9.58);
+  assert.equal(d.extendedForSpeech, true);
+});
+
+test('resolveSceneDurations: no scene ever ends before its own narration', () => {
+  const scenes = [
+    { id: 'a', durationMs: 1000 },
+    { id: 'b', durationMs: 20000 },
+    { id: 'c' },
+  ];
+  const vo = { a: 5, b: 2, c: 4 };
+  for (const d of resolveSceneDurations(scenes, { voDurations: vo, padSec: 0.8 })) {
+    assert.ok(d.durationSec >= vo[d.id], `${d.id}: ${d.durationSec} < VO ${vo[d.id]}`);
+  }
 });
 
 test('resolveSceneDurations: narration length plus padding when no explicit duration', () => {

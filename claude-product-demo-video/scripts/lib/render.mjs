@@ -62,14 +62,25 @@ export function resolveSceneDurations(scenes, { voDurations = {}, captureDuratio
   return scenes.map((scene) => {
     const vo = voDurations[scene.id] ?? 0;
     const captured = captureDurations[scene.id] ?? 0;
+
     let durationSec;
     if (scene.durationMs) durationSec = scene.durationMs / 1000;
     else if (vo > 0) durationSec = vo + padSec;
     else if (captured > 0) durationSec = captured;
     else durationSec = defaultSec;
+
+    /* An explicit durationMs is a floor, never a ceiling over the scene's own
+       narration. Voiceover is laid down at each scene's START and plays to its
+       full length, so a scene shorter than its VO does not clip that VO — it
+       runs it underneath the NEXT scene's, and two voices talk at once.
+       Observed on a real cut: a 7.00s scene carrying an 8.78s take overlapped
+       the following narration by 2.48s. */
+    const extendedForSpeech = vo > 0 && durationSec < vo + padSec;
+    if (extendedForSpeech) durationSec = vo + padSec;
+
     // capturedSec travels with the duration so the render can tell how much of
     // the scene has no source frames behind it — see sceneHoldSec.
-    return { id: scene.id, durationSec, speechSec: vo, capturedSec: captured };
+    return { id: scene.id, durationSec, speechSec: vo, capturedSec: captured, extendedForSpeech };
   });
 }
 
