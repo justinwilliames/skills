@@ -689,6 +689,10 @@ export async function run(ctx) {
       : null;
   if (!brandPath) throw new Error('capture: no brand — pass --brand or set meta.brandPath');
   const { brand: rawBrand, tokens, warnings } = await resolveBrand(brandPath, { cwd: ctx.cwd });
+  /* templates/scenes/_base.js resolves relative font and image paths against
+     meta.brandDir. Without it every template silently falls back to the system
+     face — the brand font 404s against templates/scenes/ and nothing says so. */
+  meta.brandDir = dirname(brandPath);
   const brand = await embedBrandImages(rawBrand, { cwd: dirname(brandPath), log: ctx.log });
   for (const w of warnings) ctx.log(`  brand warning: ${w}`);
   const fontCss = await fontFaceCss(brand, { cwd: dirname(brandPath), log: ctx.log });
@@ -792,6 +796,10 @@ async function captureHtml({ browser, brand, tokens, meta, scene, sceneDir, font
         },
         [brand, meta, scene, tokens],
       );
+      /* Belt and braces over meta.brandDir: these @font-face rules carry the
+         font bytes as data URIs, so they work even when path resolution does
+         not. Added before readiness so document.fonts.ready sees them. */
+      await page.addStyleTag({ content: fontCss }).catch(() => {});
       await page.waitForFunction(() => document.documentElement.dataset.ready === 'true', null, {
         timeout: 15000,
       });

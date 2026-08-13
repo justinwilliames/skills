@@ -1,0 +1,95 @@
+{
+  "_comment": [
+    "A worked storyboard scene for templates/scenes/showcase.html.",
+    "Drop this object into a storyboard's `scenes` array. Everything the frame",
+    "shows comes from `content` — a different feature is a different `content`,",
+    "not a different template.",
+    "",
+    "Card x/y/w/z are px at 1080p inside the 1010x910 cluster box, whose own",
+    "origin sits at (820, 88) in the frame. Omit any of them to take the",
+    "kind default. Exactly one card should carry badge.flipTo — that is the",
+    "card the second payload lands on, and the flip is timed to its arrival."
+  ],
+
+  "id": "integration-showcase",
+  "type": "showcase",
+  "durationMs": 7000,
+  "capture": { "kind": "html", "template": "showcase.html" },
+  "narration": "Connect your job management system once. From then on, jobs, customers, schedules, invoices and payments move both ways on their own.",
+
+  "content": {
+    "eyebrow": "Job management integration",
+    "heading": "Booked once,\nnever typed\ntwice.",
+    "outcomeWord": "twice",
+    "body": "Connect it once. Jobs, customers, schedules, invoices and payments then move both ways on their own.",
+    "cta": "Connect your system",
+    "chipLabel": "Both ways · automatic",
+    "chipGlyph": "tick",
+
+    "cards": [
+      {
+        "kind": "job",
+        "x": -8,
+        "y": 158,
+        "w": 486,
+        "z": 104,
+        "label": "Job 4821",
+        "title": "Hot water system replace",
+        "meta": "M. Okafor · 14 Ellerslie Rd, Buderim",
+        "badge": { "text": "Scheduled", "tone": "sky" },
+        "rows": [
+          { "glyph": "calendar", "label": "Thu 14 Aug, 8:00am", "dim": "· 3.5 h" },
+          { "glyph": "phone", "dim": "Booked by Sophiie on the call" }
+        ]
+      },
+      {
+        "kind": "system",
+        "x": 548,
+        "y": 16,
+        "w": 372,
+        "z": -182,
+        "meta": "your",
+        "title": "job management system",
+        "rows": [
+          { "label": "Jobs" },
+          { "label": "Customers" },
+          { "label": "Invoices" },
+          { "label": "Payments" }
+        ]
+      },
+      {
+        "kind": "schedule",
+        "x": 600,
+        "y": 392,
+        "w": 290,
+        "z": -30,
+        "label": "Thu 14 Aug",
+        "rows": [
+          { "label": "07" },
+          { "title": "Hot water replace", "meta": "8:00 – 11:30 · Dan R." },
+          { "label": "12" },
+          { "label": "14" }
+        ]
+      },
+      {
+        "kind": "invoice",
+        "x": 150,
+        "y": 572,
+        "w": 444,
+        "z": 44,
+        "label": "Invoice 4821",
+        "badge": {
+          "text": "Sent",
+          "tone": "sky",
+          "flipTo": { "text": "Paid", "tone": "ink" }
+        },
+        "rows": [
+          { "label": "250L heat pump supply", "value": "$1,180.00" },
+          { "label": "Labour, 3.5 h", "value": "$385.00" },
+          { "label": "Disposal", "value": "$60.00" },
+          { "label": "Total paid", "value": "$1,625.00", "total": true }
+        ]
+      }
+    ]
+  }
+}

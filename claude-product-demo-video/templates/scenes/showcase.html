@@ -1,0 +1,1068 @@
+<meta charset="utf-8">
+<title>pdv scene — showcase</title>
+<!--
+  Showcase — the marketing frame, as a seekable timeline.
+
+  A left type block makes the promise; a right cluster of product-shaped cards
+  shows the mechanism, with a payload travelling the connecting lanes in both
+  directions at once. That overlap is the point: a sequence of moves reads as a
+  slideshow, two things travelling at the same time reads as choreography.
+
+  Exposes the seekable contract (docs/SEEKABLE-SCENES.md):
+    window.__pdvDuration = 7000
+    window.__pdvSeek(ms)   pure with respect to time — no wall clock anywhere.
+
+  scene.content
+  ------------
+    eyebrow      short kicker, set beside the dot arc
+    heading      the promise. "\n" forces a line break; words rise one by one
+    outcomeWord  the word in `heading` set in italic and given the sky bloom.
+                 Matched case- and punctuation-insensitively
+    body         one supporting line
+    cta          optional pill label; omit for no pill
+    chipLabel    optional label on the centred chip between the lanes
+    cards        2-5 product-shaped cards, nearest first is derived from `z`
+
+  A card
+  ------
+    kind    'job' | 'invoice' | 'schedule' | 'system'   (drives the layout)
+    label   small uppercase tag in the card head        (optional)
+    title   the card's headline
+    meta    one line under the title                    (optional)
+    rows    kind-specific; see below
+    badge   'Scheduled'                                  a static pill, or
+            { text, tone, flipTo: { text, tone } }       a pill that flips
+            tone: 'sky' | 'ink' | 'quiet'
+    x, y    position in the 1010x910 cluster box, in px at 1080p
+    w       width in px at 1080p                        (optional, kind default)
+    z       depth in px; higher is nearer the camera    (optional, kind default)
+    rotate  degrees                                     (optional)
+    scale   multiplier                                  (optional)
+
+    rows by kind
+      job       { glyph, label, dim }         glyph names index brand.assets.glyphs
+      invoice   { label, value, total }       `total` sets the big amount row
+      schedule  { label }                     a time tick, or
+                { title, meta }               a booked block
+      system    { label }                     a field pill
+
+  Exactly ONE card should carry a `badge.flipTo` — it is the card the second
+  payload lands on, and the flip is timed to that arrival.
+
+  The lanes, the orb and the chip are all derived from the measured card boxes,
+  so moving a card in `content` moves everything that points at it. Lane A runs
+  from the flipping card up to the 'system' card; lane B runs back down.
+
+  ORB. brand.assets.motif.orbLight is matted against white with no soft alpha,
+  so it may only sit on a white field. Here it sits inside a pure #FFFFFF disc
+  that is clipped tighter than the matte, so no matte edge is ever composited
+  against the glow. It is also frozen to one frame on a canvas: an animated GIF
+  advances on the wall clock and would make __pdvSeek impure.
+-->
+<link rel="stylesheet" href="_base.css">
+<script src="_base.js"></script>
+
+<div class="stage" data-scene="showcase">
+  <div class="sc">
+    <div class="sc__glow sc__glow--main"></div>
+    <div class="sc__glow sc__glow--right"></div>
+    <div class="sc__glow sc__glow--left"></div>
+    <div class="sc__veil"></div>
+
+    <div class="sc__field">
+      <div class="sc__cluster" data-slot="cards"></div>
+    </div>
+
+    <svg class="sc__spine" viewBox="0 0 1920 1080" fill="none" preserveAspectRatio="none">
+      <defs>
+        <linearGradient id="scLaneA" gradientUnits="userSpaceOnUse">
+          <stop offset="0%" stop-color="var(--sc-sky)" stop-opacity="0.55"/>
+          <stop offset="30%" stop-color="var(--sc-sky)" stop-opacity="1"/>
+          <stop offset="100%" stop-color="var(--sc-sky-deep)" stop-opacity="1"/>
+        </linearGradient>
+        <linearGradient id="scLaneB" gradientUnits="userSpaceOnUse">
+          <stop offset="0%" stop-color="var(--sc-sky)" stop-opacity="0.55"/>
+          <stop offset="30%" stop-color="var(--sc-sky)" stop-opacity="1"/>
+          <stop offset="100%" stop-color="var(--sc-sky-deep)" stop-opacity="1"/>
+        </linearGradient>
+        <filter id="scLaneGlow" x="-60%" y="-60%" width="220%" height="220%">
+          <feGaussianBlur stdDeviation="10"/>
+        </filter>
+        <filter id="scPayGlow" x="-160%" y="-160%" width="420%" height="420%">
+          <feGaussianBlur stdDeviation="9"/>
+        </filter>
+      </defs>
+
+      <g class="sc-lane" data-lane="a">
+        <path class="sc-lane__halo" filter="url(#scLaneGlow)"/>
+        <path class="sc-lane__line" stroke="url(#scLaneA)"/>
+        <circle class="sc-lane__cap" r="7.5"/>
+        <path class="sc-lane__head"/>
+      </g>
+      <g class="sc-lane" data-lane="b">
+        <path class="sc-lane__halo" filter="url(#scLaneGlow)"/>
+        <path class="sc-lane__line" stroke="url(#scLaneB)"/>
+        <circle class="sc-lane__cap" r="7.5"/>
+        <path class="sc-lane__head"/>
+      </g>
+
+      <g class="sc-pay" data-pay="a">
+        <circle class="sc-pay__halo" r="17" filter="url(#scPayGlow)"/>
+        <circle class="sc-pay__core" r="9"/>
+      </g>
+      <g class="sc-pay" data-pay="b">
+        <circle class="sc-pay__halo" r="17" filter="url(#scPayGlow)"/>
+        <circle class="sc-pay__core" r="9"/>
+      </g>
+    </svg>
+
+    <div class="sc__orb">
+      <div class="sc__orbhalo"></div>
+      <div class="sc__orbdisc" data-slot="orb"></div>
+    </div>
+
+    <div class="sc__chip">
+      <span class="sc__chipglyph" data-slot="chipGlyph"></span>
+      <em data-ink="text" data-slot="chipLabel"></em>
+    </div>
+
+    <div class="sc__copy scrim">
+      <p class="sc__eyebrow">
+        <span class="sc__dots" data-slot="dots"></span>
+        <span data-ink="muted" data-slot="eyebrow"></span>
+      </p>
+      <h1 class="sc__h1" data-ink="text" data-slot="heading" data-fit="3"></h1>
+      <p class="sc__sub" data-ink="muted" data-slot="body"></p>
+      <p class="sc__cta"><span data-ink="onPrimary" data-slot="cta"></span><span class="sc__ctaArrow"></span></p>
+    </div>
+
+    <div class="sc__logo logo" data-slot="logo"></div>
+    <div class="sc__grain"></div>
+  </div>
+</div>
+
+<style>
+  /*
+   * 1rem == 1/108th of frame height (set in _base.css), so 1rem == 10px at
+   * 1080p and every measurement below is the 1080p pixel value / 10. Nothing
+   * is authored in raw px except the brand's own radii, which are px by
+   * definition in the brand file.
+   */
+  .sc { position: absolute; inset: 0; overflow: hidden; }
+
+  /* ── atmosphere: sky as glow, never a flat fill ───────────────────────── */
+
+  .sc__glow { position: absolute; pointer-events: none; z-index: 0; opacity: 0; will-change: transform, opacity; }
+
+  .sc__glow--main {
+    left: 70rem; top: 2rem; width: 130rem; height: 112rem;
+    background: radial-gradient(closest-side ellipse at 44% 48%,
+      var(--sc-glow-0) 0%, var(--sc-glow-1) 30%, var(--sc-glow-2) 60%, var(--sc-glow-3) 100%);
+    filter: blur(3rem);
+  }
+  .sc__glow--right {
+    right: -26rem; top: -20rem; width: 82rem; height: 150rem;
+    background: radial-gradient(closest-side circle at 50% 50%,
+      var(--sc-glow-1) 0%, var(--sc-glow-2) 55%, var(--sc-glow-3) 100%);
+    filter: blur(4.4rem);
+  }
+  .sc__glow--left {
+    left: -36rem; bottom: -46rem; width: 98rem; height: 98rem;
+    background: radial-gradient(closest-side circle at 50% 50%,
+      var(--sc-glow-2) 0%, var(--sc-glow-3) 100%);
+    filter: blur(5rem);
+  }
+
+  /* Keeps the type column on near-white so its contrast is the measured one
+     and not whatever the glow happened to bleed under it. */
+  .sc__veil {
+    position: absolute; left: -24rem; top: 0; width: 120rem; height: 100%;
+    z-index: 1; pointer-events: none;
+    background: linear-gradient(100deg,
+      var(--sc-page) 0%, var(--sc-page) 50%, var(--sc-page-90) 72%, var(--sc-page-0) 100%);
+  }
+
+  /* ── left: the promise ────────────────────────────────────────────────── */
+
+  .sc__copy { position: absolute; left: 11.2rem; top: 20.6rem; width: 76rem; z-index: 8; }
+
+  /* The base scrim pool is 16rem wider than its block with a 9rem blur, which
+     would put a white plate over the near edge of the card cluster. The veil
+     above already guarantees the backdrop, so the pool is off and only the
+     .scrim contract (a declared, provable backdrop colour) is kept. */
+  .sc__copy.scrim::before { display: none; }
+
+  .sc__eyebrow { display: flex; align-items: center; gap: 1.8rem; margin: 0 0 3.4rem; opacity: 0; will-change: transform, opacity; }
+  .sc__eyebrow > span:last-child {
+    font-family: var(--pdv-font-body, sans-serif);
+    font-size: 1.7rem; font-weight: 500; letter-spacing: 0.17em;
+    text-transform: uppercase; white-space: nowrap; line-height: 1;
+  }
+  .sc__dots { display: block; flex: none; height: 2.2rem; }
+  .sc__dots svg { display: block; height: 2.2rem; width: auto; }
+
+  .sc__h1 {
+    margin: 0;
+    font-family: var(--pdv-font-display, sans-serif);
+    font-weight: var(--pdv-weight-display, 500);
+    font-size: 10.4rem; line-height: 0.94;
+    letter-spacing: var(--pdv-tracking-display, -0.048em);
+  }
+  /* Words are inline-block so a transform on one cannot reflow its neighbours.
+     No padding: an inline-block's box feeds the line box, and at line-height
+     0.94 any vertical padding would open the headline's leading back up. */
+  .sc__w { display: inline-block; opacity: 0; will-change: transform, opacity; }
+  .sc__w--outcome { font-style: italic; position: relative; }
+  /* The bloom reads its own two custom properties, so the seek writes to the
+     element and the pseudo-element inherits — no stylesheet mutation. */
+  .sc__w--outcome::before {
+    content: ''; position: absolute; z-index: -1;
+    left: -30%; right: -30%; top: -24%; bottom: -8%;
+    border-radius: 50%;
+    background: radial-gradient(closest-side ellipse at 50% 50%,
+      var(--sc-bloom-0) 0%, var(--sc-bloom-1) 46%, var(--sc-glow-3) 100%);
+    filter: blur(2.8rem);
+    opacity: var(--sc-bloom-o, 0);
+    transform: scale(var(--sc-bloom-s, 0.72));
+  }
+
+  .sc__sub {
+    margin: 3.6rem 0 0; width: 56.6rem;
+    font-size: 2.5rem; line-height: 1.5; font-weight: 400;
+    opacity: 0; will-change: transform, opacity;
+  }
+
+  .sc__cta {
+    margin: 4.6rem 0 0;
+    display: inline-flex; align-items: center; gap: 1.4rem;
+    background: var(--pdv-color-text, #140934);
+    border-radius: var(--pdv-radius-button, 8px);
+    padding: 1.9rem 3.4rem;
+    font-size: 1.9rem; font-weight: 500; letter-spacing: -0.005em; line-height: 1;
+    box-shadow: var(--sc-cta-shadow);
+    opacity: 0; will-change: transform, opacity;
+  }
+  .sc__cta.is-hidden { display: none !important; }
+  .sc__ctaArrow {
+    width: 1.7rem; height: 1.4rem; flex: none;
+    background: var(--pdv-color-on-primary, #ffffff);
+    -webkit-mask: var(--sc-arrow) center / contain no-repeat;
+    mask: var(--sc-arrow) center / contain no-repeat;
+  }
+
+  .sc__logo { position: absolute; left: 11.2rem; bottom: 9.6rem; z-index: 8; opacity: 0; will-change: transform, opacity; }
+  .sc__logo .logo__img { height: 3.6rem; max-width: 40rem; }
+  .sc__logo .logo__word { font-size: 3.2rem; }
+
+  /* ── right: the exploded product ──────────────────────────────────────── */
+
+  .sc__field {
+    position: absolute; left: 82rem; top: 8.8rem; width: 101rem; height: 91rem;
+    z-index: 5; perspective: 240rem; perspective-origin: 32% 46%;
+  }
+  .sc__cluster {
+    position: absolute; inset: 0; transform-style: preserve-3d;
+    transform: rotateY(-18deg) rotateX(8deg) rotateZ(-1.6deg);
+  }
+
+  .sc-card {
+    position: absolute;
+    background: var(--pdv-color-background, #ffffff);
+    border: 1px solid var(--pdv-color-border, #ebebeb);
+    border-radius: var(--pdv-radius-card, 16px);
+    transform-style: preserve-3d;
+    opacity: 0;
+    will-change: transform, opacity;
+    box-shadow: var(--sc-card-shadow);
+  }
+  .sc-card--system { background: var(--sc-panel); border-color: var(--sc-panel-line); box-shadow: var(--sc-card-shadow-flat); }
+  .sc-card--schedule { background: var(--sc-page-soft); box-shadow: var(--sc-card-shadow-flat); }
+
+  .sc-card__head { display: flex; align-items: center; justify-content: space-between; gap: 1.6rem; }
+  .sc-card__label {
+    font-family: var(--pdv-font-display, sans-serif);
+    font-weight: var(--pdv-weight-display, 500);
+    font-size: 1.3rem; letter-spacing: 0.10em; text-transform: uppercase; white-space: nowrap;
+  }
+  .sc-card__rule { height: 1px; background: var(--pdv-color-border, #ebebeb); }
+
+  /* Badge — two faces stacked in one grid cell so the flip cannot reflow. */
+  .sc-badge { display: inline-grid; }
+  .sc-badge__face {
+    grid-area: 1 / 1;
+    display: inline-flex; align-items: center; justify-content: center;
+    border-radius: 1000px; padding: 0.7rem 1.6rem;
+    font-size: 1.3rem; letter-spacing: 0.06em; text-transform: uppercase; line-height: 1;
+    white-space: nowrap;
+    backface-visibility: hidden;
+    will-change: transform, opacity;
+  }
+  .sc-badge__face--sky   { background: var(--sc-sky-tint); }
+  .sc-badge__face--ink   { background: var(--pdv-color-text, #140934); }
+  .sc-badge__face--quiet { background: var(--sc-panel); }
+
+  /* job */
+  .sc-card--job { padding: 3rem 3.2rem; }
+  .sc-card--job .sc-card__title {
+    font-family: var(--pdv-font-display, sans-serif);
+    font-weight: var(--pdv-weight-display, 500);
+    font-size: 3.3rem; line-height: 1.12; letter-spacing: -0.028em;
+    margin: 2rem 0 0.6rem;
+  }
+  .sc-card--job .sc-card__meta { font-size: 1.9rem; margin: 0 0 2.4rem; line-height: 1.3; }
+  .sc-row { display: flex; align-items: center; gap: 1.3rem; font-size: 1.8rem; line-height: 1.2; }
+  .sc-row + .sc-row { margin-top: 1.5rem; }
+  .sc-row__glyph { width: 2rem; height: 2rem; object-fit: contain; flex: none; display: block; }
+  .sc-card--job .sc-rows { margin-top: 2.4rem; }
+
+  /* invoice */
+  .sc-card--invoice { padding: 2.6rem 2.8rem 2.4rem; }
+  .sc-line { display: flex; justify-content: space-between; align-items: baseline; gap: 2rem; font-size: 1.7rem; margin-top: 1.4rem; }
+  .sc-line__value { font-variant-numeric: tabular-nums lining-nums; }
+  .sc-line--total { align-items: center; margin-top: 1.8rem; }
+  .sc-line--total .sc-line__label {
+    font-family: var(--pdv-font-display, sans-serif);
+    font-weight: var(--pdv-weight-display, 500);
+    font-size: 1.3rem; letter-spacing: 0.10em; text-transform: uppercase;
+  }
+  /* Proportional figures on the total: tabular widths also pad the comma and
+     the point, which at 3.4rem opens visible gaps inside the amount. */
+  .sc-line--total .sc-line__value {
+    font-family: var(--pdv-font-display, sans-serif);
+    font-weight: var(--pdv-weight-display, 500);
+    font-size: 3.4rem; letter-spacing: -0.03em;
+    font-variant-numeric: lining-nums;
+  }
+
+  /* schedule */
+  .sc-card--schedule { padding: 2.2rem 2rem 2.4rem; }
+  .sc-card--schedule .sc-card__label { font-size: 1.5rem; display: block; margin-bottom: 1.4rem; }
+  .sc-tick { display: flex; align-items: center; gap: 1.2rem; height: 3.2rem; font-size: 1.3rem; }
+  .sc-tick__rule { flex: 1; height: 1px; background: var(--sc-tick-line); display: block; }
+  .sc-block {
+    margin: 0.6rem 0 0.8rem 4.2rem; border-radius: 1.2rem; padding: 1.4rem 1.6rem;
+    background: linear-gradient(160deg, var(--sc-sky-block-a) 0%, var(--sc-sky-block-b) 100%);
+    border: 1px solid var(--sc-sky-line);
+  }
+  .sc-block__title {
+    display: block;
+    font-family: var(--pdv-font-display, sans-serif);
+    font-weight: var(--pdv-weight-display, 500);
+    font-size: 1.6rem; letter-spacing: -0.02em; line-height: 1.2;
+  }
+  .sc-block__meta { display: block; font-size: 1.3rem; margin-top: 0.4rem; line-height: 1.2; text-decoration: none; }
+
+  /* system */
+  .sc-card--system { padding: 2.4rem 2.6rem 2.6rem; }
+  .sc-mark { display: grid; grid-template-columns: repeat(2, 1rem); gap: 0.4rem; width: 2.4rem; }
+  .sc-mark i { display: block; width: 1rem; height: 1rem; border-radius: 0.2rem; background: var(--sc-mark-a); }
+  .sc-mark i:nth-child(4) { background: var(--sc-mark-b); }
+  .sc-card--system .sc-card__meta { font-size: 1.9rem; letter-spacing: -0.012em; margin: 1.6rem 0 0; line-height: 1.28; }
+  .sc-card--system .sc-card__title { display: block; font-size: 1.9rem; font-weight: 500; letter-spacing: -0.012em; margin: 0; line-height: 1.28; }
+  .sc-fields { display: grid; grid-template-columns: 1fr 1fr; gap: 0.8rem; margin-top: 1.8rem; }
+  .sc-fields span {
+    font-size: 1.2rem; letter-spacing: 0.06em; text-transform: uppercase; text-align: center;
+    background: var(--pdv-color-background, #ffffff);
+    border: 1px solid var(--sc-panel-line);
+    border-radius: 1000px; padding: 0.7rem 0.8rem; line-height: 1.1;
+  }
+
+  /* ── the sync spine ───────────────────────────────────────────────────── */
+
+  .sc__spine { position: absolute; inset: 0; z-index: 6; pointer-events: none; overflow: visible; }
+  .sc-lane { opacity: 0; will-change: opacity; }
+  .sc-lane__halo { stroke: var(--sc-sky); stroke-opacity: 0.40; stroke-width: 17; fill: none; stroke-linecap: round; }
+  .sc-lane__line { stroke-width: 6; stroke-linecap: round; fill: none; }
+  .sc-lane__cap { fill: var(--pdv-color-background, #ffffff); stroke: var(--sc-sky); stroke-width: 3.5; }
+  .sc-lane__head { fill: var(--sc-sky-deep); opacity: 0; will-change: opacity; }
+  /* The payload is a filled dot with a white ring; the lane's own start cap is
+     the inverse. They sit on the same curve and must not read as the same
+     object, or the travel is invisible. */
+  .sc-pay { opacity: 0; will-change: transform, opacity; }
+  .sc-pay__halo { fill: var(--sc-sky); opacity: 0.85; }
+  .sc-pay__core { fill: var(--sc-sky-deep); stroke: var(--pdv-color-background, #ffffff); stroke-width: 4; }
+
+  /* ── orb ──────────────────────────────────────────────────────────────── */
+
+  .sc__orb { position: absolute; z-index: 7; width: 18rem; height: 18rem; opacity: 0; will-change: transform, opacity; }
+  .sc__orbhalo {
+    position: absolute; inset: -3.4rem; border-radius: 50%;
+    background: radial-gradient(closest-side circle at 50% 50%,
+      var(--sc-glow-0) 0%, var(--sc-glow-2) 50%, var(--sc-glow-3) 100%);
+    filter: blur(1.4rem);
+  }
+  /*
+   * The orb's white bed. #FFFFFF fill, and the media is clipped by the disc so
+   * the asset's hard white matte never meets the glow at an edge.
+   */
+  .sc__orbdisc {
+    position: absolute; inset: 0; border-radius: 50%; overflow: hidden;
+    background: var(--pdv-color-background, #ffffff);
+    border: 1px solid var(--sc-sky-line);
+    box-shadow: var(--sc-orb-shadow);
+  }
+  /* A hair of blur: the GIF's palette quantisation leaves hard steps inside
+     the blob that are obvious once the frame is captured at 2x. */
+  .sc__orbdisc canvas, .sc__orbdisc img {
+    position: absolute; inset: 0; width: 100%; height: 100%;
+    object-fit: cover; display: block; filter: blur(0.15rem);
+  }
+
+  /* ── chip ─────────────────────────────────────────────────────────────── */
+
+  .sc__chip {
+    position: absolute; z-index: 7;
+    display: inline-flex; align-items: center; gap: 1.1rem; white-space: nowrap;
+    background: var(--pdv-color-background, #ffffff);
+    border: 1px solid var(--sc-sky-line);
+    border-radius: 1000px; padding: 1.2rem 2.2rem;
+    box-shadow: var(--sc-chip-shadow);
+    opacity: 0; will-change: transform, opacity;
+  }
+  .sc__chip em { font-style: normal; font-size: 1.4rem; letter-spacing: 0.14em; text-transform: uppercase; line-height: 1; }
+  .sc__chipglyph { display: flex; }
+  .sc__chipglyph img { width: 1.5rem; height: 1.5rem; object-fit: contain; display: block; }
+
+  /* ── grain: kills H.264 banding across the glow and the flat card fills ── */
+
+  .sc__grain {
+    position: absolute; inset: 0; z-index: 60; pointer-events: none;
+    opacity: 0.026; mix-blend-mode: multiply;
+    background-repeat: repeat; background-size: 300px 300px;
+    background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='300' height='300'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.85' numOctaves='4' stitchTiles='stitch'/%3E%3CfeColorMatrix type='saturate' values='0'/%3E%3C/filter%3E%3Crect width='300' height='300' filter='url(%23n)'/%3E%3C/svg%3E");
+  }
+</style>
+
+<script>
+(function () {
+  'use strict';
+
+  /* ── colour helpers ─────────────────────────────────────────────────────
+     _base.js keeps its mixer private, so the few derived tints this scene
+     needs are mixed here rather than hardcoded. Nothing below is a literal
+     brand colour — every value comes out of the token map. */
+
+  function rgbOf(hex) {
+    var m = /^#?([0-9a-f]{3}|[0-9a-f]{6})$/i.exec(String(hex || '').trim());
+    if (!m) return { r: 255, g: 255, b: 255 };
+    var h = m[1].length === 3 ? m[1].replace(/(.)/g, '$1$1') : m[1];
+    return { r: parseInt(h.slice(0, 2), 16), g: parseInt(h.slice(2, 4), 16), b: parseInt(h.slice(4, 6), 16) };
+  }
+  function hexOf(c) {
+    var n = function (v) { return Math.max(0, Math.min(255, Math.round(v))).toString(16).padStart(2, '0'); };
+    return '#' + n(c.r) + n(c.g) + n(c.b);
+  }
+  /** t = 0 -> a, t = 1 -> b */
+  function mix(a, b, t) {
+    var x = rgbOf(a), y = rgbOf(b);
+    return hexOf({ r: x.r + (y.r - x.r) * t, g: x.g + (y.g - x.g) * t, b: x.b + (y.b - x.b) * t });
+  }
+  function alpha(hex, a) {
+    var c = rgbOf(hex);
+    return 'rgba(' + c.r + ',' + c.g + ',' + c.b + ',' + a + ')';
+  }
+
+  /* ── easing ─────────────────────────────────────────────────────────────
+     One place for the curves; every beat is a normalised t off `at`. */
+
+  function at(ms, start, dur) {
+    if (dur <= 0) return ms >= start ? 1 : 0;
+    return Math.max(0, Math.min(1, (ms - start) / dur));
+  }
+  function eOut(t) { return 1 - Math.pow(1 - t, 3); }
+  function eInOut(t) { return t < 0.5 ? 4 * t * t * t : 1 - Math.pow(-2 * t + 2, 3) / 2; }
+  /** Continuous 0..1..0 envelope so a payload never pops in or out. */
+  function pulse(ms, start, dur, fin, fout) {
+    if (ms <= start || ms >= start + dur) return 0;
+    return Math.min(1, (ms - start) / fin, (start + dur - ms) / fout);
+  }
+
+  /* ── layout defaults ──────────────────────────────────────────────────── */
+
+  var CARD = {
+    job:      { w: 486, z: 104,  x: -8,  y: 158 },
+    invoice:  { w: 444, z: 44,   x: 150, y: 572 },
+    schedule: { w: 290, z: -30,  x: 600, y: 392 },
+    system:   { w: 372, z: -182, x: 548, y: 16 },
+  };
+  var CLUSTER = { left: 820, top: 88, w: 1010, h: 910 };
+
+  var DUR = 7000;
+  var S = { built: false, geo: null, cards: [], words: [], glows: [] };
+
+  function rem(px) { return (px / 10) + 'rem'; }
+  function el(tag, cls, parent) {
+    var n = document.createElement(tag);
+    if (cls) n.className = cls;
+    if (parent) parent.appendChild(n);
+    return n;
+  }
+  function txt(node, value) { node.textContent = value == null ? '' : String(value); return node; }
+  function ink(node, role) { node.setAttribute('data-ink', role); return node; }
+
+  /* ── fonts ──────────────────────────────────────────────────────────────
+     _base.js resolves relative fontFiles against meta.brandDir, which
+     capture.mjs does not set — it only puts meta.brandPath in __DATA. Without
+     this the brand face silently falls back to the system stack. Data URIs
+     (what the pipeline should supply) pass straight through either path. */
+
+  function injectFonts(brand, meta) {
+    var dir = (meta && meta.brandDir)
+      || ((meta && meta.brandPath) ? String(meta.brandPath).replace(/[^/]*$/, '') : '');
+    if (!dir) return;
+    var type = (brand && brand.type) || {};
+    var rules = [];
+    ['display', 'body', 'mono'].forEach(function (slot) {
+      var spec = type[slot];
+      if (!spec || !spec.family || !Array.isArray(spec.fontFiles)) return;
+      spec.fontFiles.forEach(function (file) {
+        if (!file || !file.path) return;
+        var p = String(file.path);
+        if (/^(data:|https?:|file:)/i.test(p)) return; // _base.js already handled it
+        var url = p.charAt(0) === '/' ? 'file://' + p : 'file://' + dir.replace(/\/+$/, '') + '/' + p.replace(/^\.\//, '');
+        var fmt = /\.woff2$/i.test(url) ? 'woff2' : /\.woff$/i.test(url) ? 'woff' : 'truetype';
+        rules.push('@font-face{font-family:"' + spec.family + '";src:url("' + url + '") format("' + fmt + '");' +
+          'font-weight:' + (file.weight || spec.weight || 400) + ';font-style:' + (file.style || 'normal') + ';font-display:block;}');
+      });
+    });
+    if (!rules.length) return;
+    var style = document.createElement('style');
+    style.setAttribute('data-pdv', 'fonts-showcase');
+    style.textContent = rules.join('\n');
+    document.head.appendChild(style);
+  }
+
+  /* ── derived palette ──────────────────────────────────────────────────── */
+
+  function derive(t) {
+    var page = t['color-background'] || '#ffffff';
+    var textc = t['color-text'] || '#140934';
+    var sky = t['color-accent'] || t['color-primary'] || '#69c7fb';
+    var deep = t['color-secondary'] && t['color-secondary'] !== t['color-primary']
+      ? t['color-secondary'] : mix(sky, textc, 0.45);
+    var panel = t['color-surface'] || mix(page, textc, 0.05);
+    var border = t['color-border'] || mix(page, textc, 0.12);
+    var root = document.documentElement.style;
+
+    root.setProperty('--sc-page', page);
+    root.setProperty('--sc-page-90', alpha(page, 0.9));
+    root.setProperty('--sc-page-0', alpha(page, 0));
+    root.setProperty('--sc-page-soft', mix(panel, page, 0.55));
+    root.setProperty('--sc-panel', panel);
+    root.setProperty('--sc-panel-line', mix(border, textc, 0.06));
+    root.setProperty('--sc-tick-line', mix(border, textc, 0.03));
+    root.setProperty('--sc-sky', sky);
+    root.setProperty('--sc-sky-deep', deep);
+    root.setProperty('--sc-sky-tint', mix(sky, page, 0.78));
+    root.setProperty('--sc-sky-line', mix(sky, page, 0.42));
+    root.setProperty('--sc-sky-block-a', mix(sky, page, 0.28));
+    root.setProperty('--sc-sky-block-b', mix(sky, page, 0.72));
+    root.setProperty('--sc-mark-a', mix(border, textc, 0.42));
+    root.setProperty('--sc-mark-b', mix(border, textc, 0.20));
+    root.setProperty('--sc-glow-0', alpha(sky, 0.78));
+    root.setProperty('--sc-glow-1', alpha(mix(sky, page, 0.18), 0.52));
+    root.setProperty('--sc-glow-2', alpha(mix(sky, page, 0.32), 0.20));
+    root.setProperty('--sc-glow-3', alpha(page, 0));
+    root.setProperty('--sc-bloom-0', alpha(sky, 0.55));
+    root.setProperty('--sc-bloom-1', alpha(sky, 0.18));
+    root.setProperty('--sc-card-shadow', alpha(textc, 0.17) + ' 0 4.8rem 8.4rem -3rem, ' + alpha(textc, 0.10) + ' 0 1.4rem 3.4rem -1.2rem');
+    root.setProperty('--sc-card-shadow-flat', alpha(textc, 0.11) + ' 0 3.2rem 6.4rem -2.7rem');
+    root.setProperty('--sc-orb-shadow', alpha(textc, 0.18) + ' 0 1.6rem 3.6rem -1rem');
+    root.setProperty('--sc-chip-shadow', alpha(textc, 0.16) + ' 0 1.4rem 3.2rem -1rem');
+    root.setProperty('--sc-cta-shadow', alpha(textc, 0.22) + ' 0 1rem 2.6rem -0.8rem');
+    root.setProperty('--sc-arrow',
+      'url("data:image/svg+xml,' + encodeURIComponent(
+        '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 17 14"><path d="M1 7h14M10 1.5 15.5 7 10 12.5" ' +
+        'stroke="#000" stroke-width="2" fill="none" stroke-linecap="round" stroke-linejoin="round"/></svg>') + '")');
+
+    return { page: page, text: textc, sky: sky, deep: deep };
+  }
+
+  /* ── the dot arc beside the eyebrow ───────────────────────────────────── */
+
+  function dots(host, p) {
+    var fills = [p.text, mix(p.deep, p.sky, 0.5), p.sky, mix(p.sky, p.page, 0.45), mix(p.sky, p.page, 0.74)];
+    var cx = [5, 25, 45, 65, 82], cy = [17, 9.5, 5, 9.5, 17], r = [4.2, 4.2, 4.2, 4.2, 3.4];
+    var svg = '<svg viewBox="0 0 86 22" fill="none">';
+    for (var i = 0; i < 5; i += 1) {
+      svg += '<circle cx="' + cx[i] + '" cy="' + cy[i] + '" r="' + r[i] + '" fill="' + fills[i] + '"/>';
+    }
+    host.innerHTML = svg + '</svg>';
+  }
+
+  /* ── cards ──────────────────────────────────────────────────────────────
+     Position is set with left/top (laid out once), never with the animated
+     transform, so a seek never touches layout. */
+
+  function glyphSrc(name, d) {
+    var map = (d.brand && d.brand.assets && d.brand.assets.glyphs) || {};
+    var src = name && map[name];
+    return src ? PDV.resolveUrl(src, d.meta && d.meta.brandDir) : null;
+  }
+
+  function addGlyph(parent, name, d, cls) {
+    var src = glyphSrc(name, d);
+    if (!src) return null;
+    var img = el('img', cls, parent);
+    img.alt = '';
+    img.addEventListener('error', function () { img.remove(); });
+    img.src = src;
+    return img;
+  }
+
+  function badge(spec) {
+    if (!spec) return null;
+    var conf = typeof spec === 'string' ? { text: spec } : spec;
+    if (!conf.text) return null;
+    var wrap = el('span', 'sc-badge');
+    var face = function (c) {
+      var tone = c.tone || 'sky';
+      var n = el('span', 'sc-badge__face sc-badge__face--' + tone, wrap);
+      ink(n, tone === 'ink' ? 'onPrimary' : 'text');
+      return txt(n, c.text);
+    };
+    var a = face(conf);
+    var b = conf.flipTo && conf.flipTo.text ? face(conf.flipTo) : null;
+    return { el: wrap, a: a, b: b, flips: !!b };
+  }
+
+  function head(card, c, out) {
+    if (!c.label && !out.badge) return;
+    var h = el('div', 'sc-card__head', card);
+    if (c.label) ink(txt(el('div', 'sc-card__label', h), c.label), 'muted');
+    else el('div', null, h);
+    if (out.badge) h.appendChild(out.badge.el);
+  }
+
+  function rowsOf(c) { return Array.isArray(c.rows) ? c.rows : []; }
+  function asRow(r) { return typeof r === 'string' ? { label: r } : (r || {}); }
+
+  function buildJob(card, c, d, out) {
+    head(card, c, out);
+    if (c.title) ink(txt(el('h3', 'sc-card__title', card), c.title), 'text');
+    if (c.meta) ink(txt(el('p', 'sc-card__meta', card), c.meta), 'muted');
+    var rows = rowsOf(c);
+    if (!rows.length) return;
+    el('div', 'sc-card__rule', card);
+    var box = el('div', 'sc-rows', card);
+    rows.forEach(function (raw) {
+      var r = asRow(raw);
+      var row = el('div', 'sc-row', box);
+      addGlyph(row, r.glyph, d, 'sc-row__glyph');
+      if (r.label) ink(txt(el('span', null, row), r.label), 'text');
+      if (r.dim) ink(txt(el('span', null, row), r.dim), 'muted');
+    });
+  }
+
+  function buildInvoice(card, c, d, out) {
+    head(card, c, out);
+    rowsOf(c).forEach(function (raw) {
+      var r = asRow(raw);
+      var line = el('div', 'sc-line' + (r.total ? ' sc-line--total' : ''), card);
+      ink(txt(el('span', 'sc-line__label', line), r.label), 'muted');
+      ink(txt(el('span', 'sc-line__value', line), r.value), 'text');
+    });
+  }
+
+  function buildSchedule(card, c, d, out) {
+    if (c.label) ink(txt(el('div', 'sc-card__label', card), c.label), 'muted');
+    if (out.badge) card.appendChild(out.badge.el);
+    rowsOf(c).forEach(function (raw) {
+      var r = asRow(raw);
+      if (r.title) {
+        var b = el('div', 'sc-block', card);
+        ink(txt(el('b', 'sc-block__title', b), r.title), 'text');
+        if (r.meta) ink(txt(el('span', 'sc-block__meta', b), r.meta), 'text');
+        return;
+      }
+      var tick = el('div', 'sc-tick', card);
+      ink(txt(el('span', null, tick), r.label), 'muted');
+      el('i', 'sc-tick__rule', tick);
+    });
+  }
+
+  function buildSystem(card, c, d, out) {
+    var mark = el('div', 'sc-mark', card);
+    for (var i = 0; i < 4; i += 1) el('i', null, mark);
+    if (c.meta || c.title) {
+      var name = el('div', 'sc-card__meta', card);
+      ink(name, 'muted');
+      if (c.meta) txt(el('span', null, name), c.meta + ' ');
+      if (c.title) ink(txt(el('b', 'sc-card__title', name), c.title), 'text');
+    }
+    var rows = rowsOf(c);
+    if (!rows.length) return;
+    var fields = el('div', 'sc-fields', card);
+    rows.slice(0, 6).forEach(function (raw) {
+      ink(txt(el('span', null, fields), asRow(raw).label), 'text');
+    });
+  }
+
+  var BUILDERS = { job: buildJob, invoice: buildInvoice, schedule: buildSchedule, system: buildSystem };
+
+  function buildCards(host, list, d) {
+    host.innerHTML = '';
+    var out = [];
+    list.slice(0, 5).forEach(function (c, i) {
+      var kind = BUILDERS[c.kind] ? c.kind : 'job';
+      var def = CARD[kind];
+      var card = el('div', 'sc-card sc-card--' + kind, host);
+      var w = c.w == null ? def.w : c.w;
+      var z = c.z == null ? def.z : c.z;
+      var x = c.x == null ? def.x : c.x;
+      var y = c.y == null ? def.y : c.y;
+      card.style.left = rem(x);
+      card.style.top = rem(y);
+      card.style.width = rem(w);
+      var b = badge(c.badge);
+      var slot = { badge: b };
+      BUILDERS[kind](card, c, d, slot);
+      out.push({
+        el: card, kind: kind, z: z, badge: b,
+        base: ' translateZ(' + rem(z) + ') rotate(' + (c.rotate || 0) + 'deg) scale(' + (c.scale == null ? 1 : c.scale) + ')',
+        index: i,
+      });
+    });
+    // Nearest first: the front plate lands, then the stack builds behind it.
+    var byDepth = out.slice().sort(function (a, b) { return b.z - a.z; });
+    byDepth.forEach(function (c, i) { c.order = i; });
+    return out;
+  }
+
+  /* ── heading ────────────────────────────────────────────────────────────
+     The headline is set as PLAIN text first, because _base.js's fit routine
+     counts line boxes off Range rects: inline-block words report their own
+     boxes and the count comes back as one line per word, which drove the
+     headline straight down to the fit floor. So fit runs on flat text, and the
+     word split happens on the first seek — after fonts have settled and the
+     final font-size is already inline on the element. */
+
+  function norm(s) { return String(s || '').toLowerCase().replace(/[^a-z0-9]+/g, ''); }
+
+  function setHeadingText(node, heading) {
+    node.innerHTML = '';
+    String(heading || '').split(/\n/).forEach(function (line, li) {
+      if (li) node.appendChild(document.createElement('br'));
+      node.appendChild(document.createTextNode(line.trim()));
+    });
+  }
+
+  function splitHeading(node, heading, outcomeWord) {
+    node.innerHTML = '';
+    var want = norm(outcomeWord);
+    var words = [];
+    String(heading || '').split(/\n/).forEach(function (line, li) {
+      if (li) node.appendChild(document.createElement('br'));
+      line.trim().split(/\s+/).filter(Boolean).forEach(function (w, wi) {
+        if (wi) node.appendChild(document.createTextNode(' '));
+        var span = el('span', 'sc__w', node);
+        if (want && norm(w) === want) span.classList.add('sc__w--outcome');
+        txt(span, w);
+        words.push(span);
+      });
+    });
+    return words;
+  }
+
+  /* ── geometry ───────────────────────────────────────────────────────────
+     Measured once, on the first seek — by then fonts have settled and the
+     card boxes are final. Cached, so every later seek is a pure read. */
+
+  function frameBox(node, scale) {
+    var r = node.getBoundingClientRect();
+    return { x: r.left * scale.x, y: r.top * scale.y, w: r.width * scale.x, h: r.height * scale.y };
+  }
+
+  function cubic(s, e, bow) {
+    var dx = e.x - s.x, dy = e.y - s.y;
+    var len = Math.sqrt(dx * dx + dy * dy) || 1;
+    var nx = -dy / len, ny = dx / len;
+    var k = bow * len;
+    return 'M' + s.x + ' ' + s.y +
+      ' C ' + (s.x + dx * 0.34 + nx * k) + ' ' + (s.y + dy * 0.34 + ny * k) +
+      ', ' + (s.x + dx * 0.70 + nx * k * 0.55) + ' ' + (s.y + dy * 0.70 + ny * k * 0.55) +
+      ', ' + e.x + ' ' + e.y;
+  }
+
+  function sample(path, n) {
+    var len = path.getTotalLength() || 1;
+    var pts = [];
+    for (var i = 0; i <= n; i += 1) {
+      var p = path.getPointAtLength((len * i) / n);
+      pts.push([p.x, p.y]);
+    }
+    return pts;
+  }
+  function atFrac(pts, f) {
+    var x = Math.max(0, Math.min(1, f)) * (pts.length - 1);
+    var i = Math.floor(x), j = Math.min(i + 1, pts.length - 1), t = x - i;
+    return { x: pts[i][0] + (pts[j][0] - pts[i][0]) * t, y: pts[i][1] + (pts[j][1] - pts[i][1]) * t };
+  }
+  function angleAt(pts, f) {
+    var a = atFrac(pts, Math.max(0, f - 0.02));
+    var b = atFrac(pts, Math.min(1, f + 0.02));
+    return (Math.atan2(b.y - a.y, b.x - a.x) * 180) / Math.PI + 90;
+  }
+
+  function ensureGeometry() {
+    if (S.geo) return S.geo;
+
+    // Word split, once, now that the fit pass has settled the headline size.
+    var h1 = document.querySelector('[data-slot="heading"]');
+    S.words = splitHeading(h1, S.heading, S.outcomeWord);
+    S.outcome = h1.querySelector('.sc__w--outcome');
+
+    var vw = window.innerWidth || 1920, vh = window.innerHeight || 1080;
+    var scale = { x: 1920 / vw, y: 1080 / vh };
+
+    var hub = null, spoke = null;
+    S.cards.forEach(function (c) { if (!hub && c.kind === 'system') hub = c; });
+    S.cards.forEach(function (c) { if (!spoke && c.badge && c.badge.flips) spoke = c; });
+    if (!hub) hub = S.cards[S.cards.length - 1];
+    if (!spoke || spoke === hub) {
+      spoke = null;
+      S.cards.forEach(function (c) { if (!spoke && c !== hub) spoke = c; });
+    }
+    if (!hub || !spoke) { S.geo = { ok: false }; return S.geo; }
+
+    var H = frameBox(hub.el, scale), P = frameBox(spoke.el, scale);
+    var pathA = S.laneA.querySelector('.sc-lane__line');
+    var pathB = S.laneB.querySelector('.sc-lane__line');
+
+    // Fractions taken off the c3 poster's hand-tuned endpoints, expressed
+    // against the measured boxes so the lanes follow the cards.
+    var aS = { x: P.x + P.w * 0.71, y: P.y + 4 };
+    var aE = { x: H.x + H.w * 0.18, y: H.y + H.h + 34 };
+    var bS = { x: H.x + H.w * 0.02, y: H.y + H.h + 8 };
+    var bE = { x: P.x + P.w * 0.53, y: P.y - 8 };
+
+    var dA = cubic(aS, aE, 0.14), dB = cubic(bS, bE, 0.14);
+    pathA.setAttribute('d', dA);
+    pathB.setAttribute('d', dB);
+    S.laneA.querySelector('.sc-lane__halo').setAttribute('d', dA);
+    S.laneB.querySelector('.sc-lane__halo').setAttribute('d', dB);
+
+    var gA = document.getElementById('scLaneA'), gB = document.getElementById('scLaneB');
+    [[gA, aS, aE], [gB, bS, bE]].forEach(function (g) {
+      g[0].setAttribute('x1', g[1].x); g[0].setAttribute('y1', g[1].y);
+      g[0].setAttribute('x2', g[2].x); g[0].setAttribute('y2', g[2].y);
+    });
+
+    var ptsA = sample(pathA, 200), ptsB = sample(pathB, 200);
+
+    [[S.laneA, aS, ptsA], [S.laneB, bS, ptsB]].forEach(function (l) {
+      var cap = l[0].querySelector('.sc-lane__cap');
+      cap.setAttribute('cx', l[1].x); cap.setAttribute('cy', l[1].y);
+      var end = atFrac(l[2], 1), ang = angleAt(l[2], 1);
+      var headEl = l[0].querySelector('.sc-lane__head');
+      headEl.setAttribute('d', 'M0 -20 L-11 6 L11 6 Z');
+      headEl.setAttribute('transform', 'translate(' + end.x + ' ' + end.y + ') rotate(' + ang + ')');
+    });
+
+    // Orb between the two lanes at their midpoints; chip between their two
+    // lower ends. Both follow the cards because the lanes do.
+    var mA = atFrac(ptsA, 0.5), mB = atFrac(ptsB, 0.5);
+    var orbC = { x: (mA.x + mB.x) / 2, y: (mA.y + mB.y) / 2 };
+    var chipC = { x: (aS.x + bE.x) / 2, y: Math.min(aS.y, bE.y) - 28 };
+
+    S.orb.style.left = (orbC.x / 1920 * 100) + '%';
+    S.orb.style.top = (orbC.y / 1080 * 100) + '%';
+    S.orb.style.marginLeft = '-9rem';
+    S.orb.style.marginTop = '-9rem';
+    S.chip.style.left = (chipC.x / 1920 * 100) + '%';
+    S.chip.style.top = (chipC.y / 1080 * 100) + '%';
+
+    S.geo = { ok: true, ptsA: ptsA, ptsB: ptsB, hub: hub, spoke: spoke };
+    return S.geo;
+  }
+
+  /* ── the timeline ───────────────────────────────────────────────────────
+     Every value below is a function of `ms` and nothing else. */
+
+  var BEAT = {
+    glow:     { s: 0,    d: 900 },
+    orb:      { s: 150,  d: 780 },
+    logo:     { s: 300,  d: 700 },
+    eyebrow:  { s: 600,  d: 520 },
+    wordFrom: 760, wordDur: 600, wordSpread: 340, wordStepMax: 78,
+    cards:    { s: 1400, d: 620, step: 190 },
+    laneA:    { s: 2050, d: 420 },
+    laneB:    { s: 2850, d: 420 },
+    payA:     { s: 2200, d: 1700 },
+    payB:     { s: 3000, d: 1600 },
+    flip:     { s: 4200, d: 1000 },
+    chip:     { s: 5000, d: 820 },
+    body:     { s: 5100, d: 700 },
+    cta:      { s: 5600, d: 600 },
+    breathe:  { s: 6200, d: 800 },
+  };
+
+  function seek(ms) {
+    if (!S.built) return;
+    var geo = ensureGeometry();
+    var t;
+
+    var gIn = eOut(at(ms, BEAT.glow.s, BEAT.glow.d));
+    var breathe = eInOut(at(ms, BEAT.breathe.s, BEAT.breathe.d));
+    S.glows.forEach(function (g) {
+      g.style.opacity = String(0.40 + 0.60 * gIn);
+      g.style.transform = 'scale(' + (0.80 + 0.20 * gIn + 0.045 * breathe) + ')';
+    });
+
+    t = eOut(at(ms, BEAT.orb.s, BEAT.orb.d));
+    S.orb.style.opacity = String(t);
+    S.orb.style.transform = 'scale(' + (0.84 + 0.16 * t + 0.035 * breathe) + ')';
+
+    t = eOut(at(ms, BEAT.logo.s, BEAT.logo.d));
+    S.logo.style.opacity = String(t);
+    S.logo.style.transform = 'translate3d(0,' + ((1 - t) * 16) + 'px,0)';
+
+    t = eOut(at(ms, BEAT.eyebrow.s, BEAT.eyebrow.d));
+    S.eyebrow.style.opacity = String(t);
+    S.eyebrow.style.transform = 'translate3d(0,' + ((1 - t) * 18) + 'px,0)';
+
+    var n = S.words.length;
+    var step = n > 1 ? Math.min(BEAT.wordStepMax, BEAT.wordSpread / (n - 1)) : 0;
+    var lastStart = BEAT.wordFrom + step * Math.max(0, n - 1);
+    for (var i = 0; i < n; i += 1) {
+      t = eOut(at(ms, BEAT.wordFrom + step * i, BEAT.wordDur));
+      S.words[i].style.opacity = String(t);
+      S.words[i].style.transform = 'translate3d(0,' + ((1 - t) * 46) + 'px,0)';
+    }
+    if (S.outcome) {
+      t = eOut(at(ms, lastStart + 240, 400));
+      S.outcome.style.setProperty('--sc-bloom-o', String(t * 0.95));
+      S.outcome.style.setProperty('--sc-bloom-s', String(0.72 + 0.28 * t));
+    }
+
+    S.cards.forEach(function (c) {
+      var ct = eOut(at(ms, BEAT.cards.s + c.order * BEAT.cards.step, BEAT.cards.d));
+      c.el.style.opacity = String(ct);
+      c.el.style.transform = 'translate3d(0,' + ((1 - ct) * 56) + 'px,0)' + c.base;
+    });
+
+    if (geo.ok) {
+      S.laneA.style.opacity = String(eOut(at(ms, BEAT.laneA.s, BEAT.laneA.d)));
+      S.laneB.style.opacity = String(eOut(at(ms, BEAT.laneB.s, BEAT.laneB.d)));
+      S.laneA.querySelector('.sc-lane__head').style.opacity =
+        String(eOut(at(ms, BEAT.payA.s + BEAT.payA.d - 380, 380)));
+      S.laneB.querySelector('.sc-lane__head').style.opacity =
+        String(eOut(at(ms, BEAT.payB.s + BEAT.payB.d - 380, 380)));
+
+      var pa = eInOut(at(ms, BEAT.payA.s, BEAT.payA.d));
+      var qa = atFrac(geo.ptsA, pa);
+      var va = pulse(ms, BEAT.payA.s, BEAT.payA.d, 160, 200);
+      S.payA.style.opacity = String(va);
+      S.payA.setAttribute('transform', 'translate(' + qa.x + ' ' + qa.y + ') scale(' + (0.6 + 0.4 * va) + ')');
+
+      var pb = eInOut(at(ms, BEAT.payB.s, BEAT.payB.d));
+      var qb = atFrac(geo.ptsB, pb);
+      var vb = pulse(ms, BEAT.payB.s, BEAT.payB.d, 160, 200);
+      S.payB.style.opacity = String(vb);
+      S.payB.setAttribute('transform', 'translate(' + qb.x + ' ' + qb.y + ') scale(' + (0.6 + 0.4 * vb) + ')');
+    }
+
+    if (S.flip) {
+      var f = eInOut(at(ms, BEAT.flip.s, BEAT.flip.d));
+      S.flip.a.style.transform = 'perspective(220px) rotateX(' + (-90 * f) + 'deg)';
+      S.flip.a.style.opacity = f < 0.5 ? '1' : '0';
+      S.flip.b.style.transform = 'perspective(220px) rotateX(' + (90 * (1 - f)) + 'deg)';
+      S.flip.b.style.opacity = f < 0.5 ? '0' : '1';
+    }
+
+    t = eOut(at(ms, BEAT.chip.s, BEAT.chip.d));
+    S.chip.style.opacity = String(t);
+    S.chip.style.transform = 'translate(-50%,-50%) translate3d(0,' + ((1 - t) * 14) + 'px,0) scale(' + (0.92 + 0.08 * t) + ')';
+
+    t = eOut(at(ms, BEAT.body.s, BEAT.body.d));
+    S.sub.style.opacity = String(t);
+    S.sub.style.transform = 'translate3d(0,' + ((1 - t) * 22) + 'px,0)';
+
+    t = eOut(at(ms, BEAT.cta.s, BEAT.cta.d));
+    S.cta.style.opacity = String(t);
+    S.cta.style.transform = 'translate3d(0,' + ((1 - t) * 20) + 'px,0)';
+  }
+
+  /* ── orb: one frozen frame on a canvas ──────────────────────────────────
+     An animated GIF advances on the wall clock, so a screenshot at ms=3600
+     would differ depending on when it was taken. Painting the first decoded
+     frame into a canvas removes time from the asset entirely. */
+
+  function mountOrb(host, src) {
+    host.innerHTML = '';
+    if (!src) return;
+    var canvas = el('canvas', null, host);
+    canvas.width = 520;
+    canvas.height = 520;
+    var img = new Image();
+    img.onload = function () {
+      canvas.width = img.naturalWidth || 520;
+      canvas.height = img.naturalHeight || 300;
+      var ctx = canvas.getContext('2d');
+      if (!ctx) { host.innerHTML = ''; host.appendChild(img); return; }
+      ctx.drawImage(img, 0, 0);
+    };
+    img.onerror = function () { host.innerHTML = ''; };
+    img.src = src;
+  }
+
+  /* ── boot ───────────────────────────────────────────────────────────── */
+
+  window.__pdvDuration = DUR;
+  window.__pdvSeek = seek;
+
+  PDV.boot(function (d) {
+    var c = d.content || {};
+    var t = d.tokens || PDV._tokens || {};
+    var p = derive(t);
+    injectFonts(d.brand, d.meta);
+
+    dots(document.querySelector('[data-slot="dots"]'), p);
+    PDV.setSlot('eyebrow', c.eyebrow);
+    PDV.setSlot('body', c.body);
+    PDV.setSlot('chipLabel', c.chipLabel);
+    PDV.setLogo('logo', d.brand, d.meta);
+
+    S.heading = c.heading || (d.meta && d.meta.title) || '';
+    S.outcomeWord = c.outcomeWord;
+    S.words = [];
+    S.outcome = null;
+    var h1 = document.querySelector('[data-slot="heading"]');
+    setHeadingText(h1, S.heading);
+    // The line budget IS the author's own break count, floored at 3. Fixed at
+    // 4, a heading whose explicit lines overflow the column ragged onto a
+    // fourth line instead of shrinking to the breaks it was written with.
+    h1.setAttribute('data-fit', String(Math.max(3, S.heading.split(/\n/).length)));
+
+
+    var ctaText = document.querySelector('[data-slot="cta"]');
+    S.cta = document.querySelector('.sc__cta');
+    if (c.cta) txt(ctaText, c.cta); else S.cta.classList.add('is-hidden');
+
+    var chipGlyph = document.querySelector('[data-slot="chipGlyph"]');
+    if (c.chipLabel) addGlyph(chipGlyph, c.chipGlyph || 'tick', d);
+
+    S.cards = buildCards(document.querySelector('[data-slot="cards"]'), Array.isArray(c.cards) ? c.cards : [], d);
+    S.cards.forEach(function (card) { if (!S.flip && card.badge && card.badge.flips) S.flip = card.badge; });
+
+    var motif = (d.brand && d.brand.assets && d.brand.assets.motif) || {};
+    mountOrb(document.querySelector('[data-slot="orb"]'),
+      motif.orbLight ? PDV.resolveUrl(motif.orbLight, d.meta && d.meta.brandDir) : null);
+
+    S.glows = [].slice.call(document.querySelectorAll('.sc__glow'));
+    S.orb = document.querySelector('.sc__orb');
+    S.chip = document.querySelector('.sc__chip');
+    S.logo = document.querySelector('.sc__logo');
+    S.eyebrow = document.querySelector('.sc__eyebrow');
+    S.sub = document.querySelector('.sc__sub');
+    S.laneA = document.querySelector('[data-lane="a"]');
+    S.laneB = document.querySelector('[data-lane="b"]');
+    S.payA = document.querySelector('[data-pay="a"]');
+    S.payB = document.querySelector('[data-pay="b"]');
+    if (!c.chipLabel) S.chip.classList.add('is-hidden');
+
+    S.built = true;
+    S.geo = null;
+  });
+}());
+</script>
