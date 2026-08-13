@@ -18,5 +18,8 @@
   },
   "dependencies": {
     "playwright": "^1.49.0"
+  },
+  "optionalDependencies": {
+    "kokoro-js": "^1.2.1"
   }
 }

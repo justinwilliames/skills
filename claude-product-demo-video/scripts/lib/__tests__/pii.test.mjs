@@ -56,9 +56,9 @@ test('literal matching is case-insensitive unless told otherwise', () => {
 });
 
 test('autoRedact and redactText compose', () => {
-  const out = redact('justin@sophiie.ai / +61 412 345 678 / Justin Williames', {
+  const out = redact('sam@acme.example / +61 412 345 678 / Sam Okonkwo', {
     autoRedact: ['email', 'phone'],
-    redactText: [{ text: 'Justin Williames', replacement: 'Dana Whitfield' }],
+    redactText: [{ text: 'Sam Okonkwo', replacement: 'Dana Whitfield' }],
   });
   assert.equal(out, 'you@example.com / 04xx xxx xxx / Dana Whitfield');
 });

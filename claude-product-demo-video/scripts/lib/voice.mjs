@@ -120,6 +120,12 @@ export function detectProvider(requested, { platform = process.platform, env = p
     };
   }
 
+  if (want === 'kokoro') {
+    // Local and keyless. Availability is a package question, resolved when the
+    // model is first loaded, so nothing to check here.
+    return { provider: 'kokoro', reason: null };
+  }
+
   if (want === 'say') {
     if (platform === 'darwin') return { provider: 'say', reason: null };
     return {
@@ -129,7 +135,7 @@ export function detectProvider(requested, { platform = process.platform, env = p
     };
   }
 
-  throw new Error(`unknown voice provider "${want}". Use say, elevenlabs, openai or none.`);
+  throw new Error(`unknown voice provider "${want}". Use kokoro, say, elevenlabs, openai or none.`);
 }
 
 /**
@@ -222,6 +228,80 @@ async function synthElevenLabs(text, dest, { voiceId, debug }) {
   debug(`elevenlabs wrote ${raw}`);
   return raw;
 }
+
+/** Where kokoro-js fetches a voice when the shipped copy cannot be resolved. */
+const KOKORO_MODEL = 'onnx-community/Kokoro-82M-v1.0-ONNX';
+const KOKORO_VOICE_BASE = `https://huggingface.co/${KOKORO_MODEL}/resolve/main/voices`;
+
+/** Loaded once per process — the model is ~80MB and reloading it per scene is wasteful. */
+let kokoroPromise = null;
+
+async function loadKokoro({ dtype = 'q8', debug = () => {} } = {}) {
+  if (kokoroPromise) return kokoroPromise;
+  kokoroPromise = (async () => {
+    let mod;
+    try {
+      mod = await import('kokoro-js');
+    } catch {
+      throw new Error(
+        'voice provider "kokoro" needs the kokoro-js package.\n\n' +
+          `  install it:  npm install --prefix "${resolve(dirname(new URL(import.meta.url).pathname), '..', '..')}" kokoro-js\n` +
+          '  or run:      bash scripts/install.sh\n\n' +
+          '  It is optional on purpose — it pulls onnxruntime, which is large.',
+      );
+    }
+    debug('kokoro: loading model (first run downloads ~80MB to the HF cache)');
+    const tts = await mod.KokoroTTS.from_pretrained(KOKORO_MODEL, { dtype, device: 'cpu' });
+    return tts;
+  })();
+  return kokoroPromise;
+}
+
+/**
+ * Kokoro-82M, Apache 2.0, entirely local. No API key, no per-character cost and
+ * no terms restricting commercial use of the output — which macOS `say` cannot
+ * promise and the hosted providers charge for.
+ *
+ * kokoro-js reads its voice files from a path resolved against its own module
+ * directory. That resolution fails in some contexts (notably `node -e`, where
+ * import.meta.dirname is undefined and it falls back to the cwd), so a missing
+ * voice is healed by fetching it to exactly the path the loader asked for
+ * rather than guessing where that is.
+ */
+async function synthKokoro(text, dest, { voiceId, rateWpm, debug }) {
+  const tts = await loadKokoro({ debug });
+  const voice = voiceId ?? 'bf_emma';
+  // Kokoro's own baseline lands near 165 wpm; express rate as a multiplier.
+  const speed = Math.max(0.5, Math.min(2, (rateWpm ?? 165) / 165));
+
+  let audio;
+  for (let attempt = 0; attempt < 2; attempt += 1) {
+    try {
+      audio = await tts.generate(text, { voice, speed });
+      break;
+    } catch (err) {
+      const m = /ENOENT.*?open '([^']+\/voices\/([^'/]+)\.bin)'/.exec(err?.message ?? '');
+      if (!m || attempt === 1) throw err;
+      const [, path, name] = m;
+      debug(`kokoro: voice "${name}" missing, fetching to ${path}`);
+      const res = await fetch(`${KOKORO_VOICE_BASE}/${name}.bin`);
+      if (!res.ok) throw new Error(`kokoro voice download failed: HTTP ${res.status} for ${name}`);
+      await mkdir(dirname(path), { recursive: true });
+      await writeFile(path, Buffer.from(await res.arrayBuffer()));
+    }
+  }
+
+  const raw = `${dest}.kokoro.wav`;
+  await audio.save(raw);
+  debug(`kokoro wrote ${raw} (${voice} @ ${speed.toFixed(2)}x)`);
+  return raw;
+}
+
+/** The voices worth defaulting to, by the model's own quality grades. */
+export const KOKORO_RECOMMENDED = {
+  'en-us': 'af_heart',
+  'en-gb': 'bf_emma',
+};
 
 async function synthOpenAI(text, dest, { voiceId, debug }) {
   const res = await fetch('https://api.openai.com/v1/audio/speech', {
@@ -406,6 +486,7 @@ export async function run(ctx) {
 
     let raw;
     if (provider === 'say') raw = await synthSay(spoken, dest, { voiceId, rateWpm, debug });
+    else if (provider === 'kokoro') raw = await synthKokoro(spoken, dest, { voiceId, rateWpm, debug });
     else if (provider === 'elevenlabs') raw = await synthElevenLabs(spoken, dest, { voiceId, debug });
     else if (provider === 'openai') raw = await synthOpenAI(spoken, dest, { voiceId, debug });
     else raw = await synthSilence(spoken, dest, { rateWpm, debug });

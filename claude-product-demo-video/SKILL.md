@@ -150,6 +150,31 @@ edit is any good. Check: does the zoom land on the thing being described, does
 the music sit under the voice or fight it, does any caption cover the UI it is
 describing, does the last frame hold long enough to read.
 
+## Narration
+
+| Provider | Cost | Licence posture | Use it when |
+|---|---|---|---|
+| **`kokoro`** | Free, local | Apache 2.0, model and output unrestricted | **The default.** Kokoro-82M runs on CPU faster than realtime, needs no key, and 28 graded voices ship with it |
+| `say` | Free, local | macOS voices are **not** cleared for commercial redistribution everywhere | Review cuts and internal videos |
+| `elevenlabs` / `openai` | Per character | Check the provider's terms | You want a specific hosted voice |
+| `none` | — | — | Captions only |
+
+Kokoro is optional at install time because it pulls `onnxruntime`, which is
+large. `scripts/install.sh` offers it; the model (~80MB) downloads on first
+synthesis and is cached afterwards.
+
+Voices are graded by the model's own authors. `af_heart` is the only A-grade
+voice (en-us, female); `bf_emma` is the best en-gb female. Pick with
+`audio.voice.voiceId`.
+
+```jsonc
+"audio": { "voice": { "provider": "kokoro", "voiceId": "bf_emma", "rateWpm": 160 } }
+```
+
+A hosted provider's key is read from `$ELEVENLABS_API_KEY` / `$OPENAI_API_KEY`,
+or from `~/.elevenlabs_key` / `~/.openai_key` — so a credential never has to be
+pasted into whatever is driving the build.
+
 ## Installation
 
 ```bash

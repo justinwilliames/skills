@@ -2,172 +2,352 @@
   "$schema": "http://json-schema.org/draft-07/schema#",
   "$id": "https://github.com/justinwilliames/skills/claude-product-demo-video/schemas/brand.schema.json",
   "title": "Brand contract",
-  "description": "Everything the pipeline needs to render on-brand output. Collected once per project by the brand intake, then cached. Nothing here is inferred silently — an unanswered field falls back to a neutral default and is reported.",
+  "description": "Everything the pipeline needs to render on-brand output. Collected once per project by the brand intake, then cached. Nothing here is inferred silently \u2014 an unanswered field falls back to a neutral default and is reported.",
   "type": "object",
-  "required": ["name", "color", "type"],
+  "required": [
+    "name",
+    "color",
+    "type"
+  ],
   "additionalProperties": false,
   "properties": {
-    "name": { "type": "string", "description": "Product or company name as it should appear on screen." },
-    "tagline": { "type": "string" },
-    "url": { "type": "string", "description": "Shown on the outro card." },
-
+    "name": {
+      "type": "string",
+      "description": "Product or company name as it should appear on screen."
+    },
+    "tagline": {
+      "type": "string"
+    },
+    "url": {
+      "type": "string",
+      "description": "Shown on the outro card."
+    },
     "logo": {
       "type": "object",
       "description": "Absolute or project-relative paths. SVG preferred; PNG must be at least 1000px on its long edge to survive 1080p.",
       "additionalProperties": false,
       "properties": {
-        "primary": { "type": "string", "description": "Full-colour lockup for light backgrounds." },
-        "inverse": { "type": "string", "description": "Reversed lockup for dark backgrounds." },
-        "mark": { "type": "string", "description": "Icon/isotype only, for corner bugs and tight frames." },
-        "safeAreaRatio": { "type": "number", "default": 0.5, "description": "Clear space around the logo as a fraction of its height." },
-        "minHeightPx": { "type": "integer", "default": 48 }
+        "primary": {
+          "type": "string",
+          "description": "Full-colour lockup for light backgrounds."
+        },
+        "inverse": {
+          "type": "string",
+          "description": "Reversed lockup for dark backgrounds."
+        },
+        "mark": {
+          "type": "string",
+          "description": "Icon/isotype only, for corner bugs and tight frames."
+        },
+        "safeAreaRatio": {
+          "type": "number",
+          "default": 0.5,
+          "description": "Clear space around the logo as a fraction of its height."
+        },
+        "minHeightPx": {
+          "type": "integer",
+          "default": 48
+        }
       }
     },
-
     "color": {
       "type": "object",
-      "required": ["primary", "background", "text"],
+      "required": [
+        "primary",
+        "background",
+        "text"
+      ],
       "additionalProperties": false,
       "properties": {
-        "primary": { "type": "string", "pattern": "^#[0-9a-fA-F]{6}$", "description": "Brand colour. Used for CTAs, accents and the progress bar." },
-        "secondary": { "type": "string", "pattern": "^#[0-9a-fA-F]{6}$" },
-        "accent": { "type": "string", "pattern": "^#[0-9a-fA-F]{6}$" },
-        "background": { "type": "string", "pattern": "^#[0-9a-fA-F]{6}$", "description": "Scene background." },
-        "surface": { "type": "string", "pattern": "^#[0-9a-fA-F]{6}$", "description": "Card / panel fill." },
-        "text": { "type": "string", "pattern": "^#[0-9a-fA-F]{6}$", "description": "Primary type colour. Must clear 4.5:1 against background." },
-        "textMuted": { "type": "string", "pattern": "^#[0-9a-fA-F]{6}$" },
-        "border": { "type": "string", "pattern": "^#[0-9a-fA-F]{6}$" },
+        "primary": {
+          "type": "string",
+          "pattern": "^#[0-9a-fA-F]{6}$",
+          "description": "Brand colour. Used for CTAs, accents and the progress bar."
+        },
+        "secondary": {
+          "type": "string",
+          "pattern": "^#[0-9a-fA-F]{6}$"
+        },
+        "accent": {
+          "type": "string",
+          "pattern": "^#[0-9a-fA-F]{6}$"
+        },
+        "background": {
+          "type": "string",
+          "pattern": "^#[0-9a-fA-F]{6}$",
+          "description": "Scene background."
+        },
+        "surface": {
+          "type": "string",
+          "pattern": "^#[0-9a-fA-F]{6}$",
+          "description": "Card / panel fill."
+        },
+        "text": {
+          "type": "string",
+          "pattern": "^#[0-9a-fA-F]{6}$",
+          "description": "Primary type colour. Must clear 4.5:1 against background."
+        },
+        "textMuted": {
+          "type": "string",
+          "pattern": "^#[0-9a-fA-F]{6}$"
+        },
+        "border": {
+          "type": "string",
+          "pattern": "^#[0-9a-fA-F]{6}$"
+        },
         "gradient": {
           "type": "object",
           "additionalProperties": false,
           "properties": {
-            "from": { "type": "string", "pattern": "^#[0-9a-fA-F]{6}$" },
-            "to": { "type": "string", "pattern": "^#[0-9a-fA-F]{6}$" },
-            "angleDeg": { "type": "number", "default": 135 }
+            "from": {
+              "type": "string",
+              "pattern": "^#[0-9a-fA-F]{6}$"
+            },
+            "to": {
+              "type": "string",
+              "pattern": "^#[0-9a-fA-F]{6}$"
+            },
+            "angleDeg": {
+              "type": "number",
+              "default": 135
+            }
           }
         }
       }
     },
-
     "type": {
       "type": "object",
-      "required": ["display"],
+      "required": [
+        "display"
+      ],
       "additionalProperties": false,
       "properties": {
         "display": {
           "type": "object",
-          "required": ["family"],
+          "required": [
+            "family"
+          ],
           "additionalProperties": false,
           "properties": {
-            "family": { "type": "string" },
-            "fallbackStack": { "type": "string" },
-            "weight": { "type": "integer", "default": 700 },
-            "letterSpacingEm": { "type": "number", "default": -0.02 },
+            "family": {
+              "type": "string"
+            },
+            "fallbackStack": {
+              "type": "string"
+            },
+            "weight": {
+              "type": "integer",
+              "default": 700
+            },
+            "letterSpacingEm": {
+              "type": "number",
+              "default": -0.02
+            },
             "fontFiles": {
               "type": "array",
-              "description": "Local woff2/ttf paths. Self-hosted only — the renderer runs offline and will not reach a font CDN.",
+              "description": "Local woff2/ttf paths. Self-hosted only \u2014 the renderer runs offline and will not reach a font CDN.",
               "items": {
                 "type": "object",
-                "required": ["path"],
+                "required": [
+                  "path"
+                ],
                 "additionalProperties": false,
                 "properties": {
-                  "path": { "type": "string" },
-                  "weight": { "type": "integer" },
-                  "style": { "type": "string", "enum": ["normal", "italic"] }
+                  "path": {
+                    "type": "string"
+                  },
+                  "weight": {
+                    "type": "integer"
+                  },
+                  "style": {
+                    "type": "string",
+                    "enum": [
+                      "normal",
+                      "italic"
+                    ]
+                  }
                 }
               }
             },
-            "license": { "type": "string", "description": "Font licence. Recorded so the output can be cleared for public use." }
+            "license": {
+              "type": "string",
+              "description": "Font licence. Recorded so the output can be cleared for public use."
+            }
           }
         },
         "body": {
           "type": "object",
           "additionalProperties": false,
           "properties": {
-            "family": { "type": "string" },
-            "fallbackStack": { "type": "string" },
-            "weight": { "type": "integer", "default": 400 },
-            "fontFiles": { "type": "array", "items": { "type": "object" } },
-            "license": { "type": "string" }
+            "family": {
+              "type": "string"
+            },
+            "fallbackStack": {
+              "type": "string"
+            },
+            "weight": {
+              "type": "integer",
+              "default": 400
+            },
+            "fontFiles": {
+              "type": "array",
+              "items": {
+                "type": "object"
+              }
+            },
+            "license": {
+              "type": "string"
+            }
           }
         },
         "mono": {
           "type": "object",
           "additionalProperties": false,
           "properties": {
-            "family": { "type": "string" },
-            "fallbackStack": { "type": "string" }
+            "family": {
+              "type": "string"
+            },
+            "fallbackStack": {
+              "type": "string"
+            }
           }
         }
       }
     },
-
     "shape": {
       "type": "object",
       "additionalProperties": false,
       "properties": {
-        "radiusButtonPx": { "type": "integer", "default": 8 },
-        "radiusCardPx": { "type": "integer", "default": 12 },
-        "shadow": { "type": "string", "description": "CSS box-shadow applied to cards and the browser frame." }
+        "radiusButtonPx": {
+          "type": "integer",
+          "default": 8
+        },
+        "radiusCardPx": {
+          "type": "integer",
+          "default": 12
+        },
+        "shadow": {
+          "type": "string",
+          "description": "CSS box-shadow applied to cards and the browser frame."
+        }
       }
     },
-
     "motion": {
       "type": "object",
       "description": "House motion rules. Keeps every video from this brand feeling like the same series.",
       "additionalProperties": false,
       "properties": {
-        "pace": { "type": "string", "enum": ["calm", "standard", "brisk"], "default": "standard" },
-        "defaultTransition": { "type": "string", "default": "fade" },
-        "transitionMs": { "type": "integer", "default": 600 },
-        "kenBurnsIntensity": { "type": "number", "default": 0.08, "minimum": 0, "maximum": 0.09, "description": "Peak scale delta of the slow push. The safe areas in templates/scenes are drawn against the crop this produces — the browser-chrome frame's margin is fully spent at 0.0965 and the corner furniture at 0.111 — so 0.09 is the ceiling. 0.08 is the house default; motion.mjs clamps anything higher and says so." },
-        "easing": { "type": "string", "default": "easeInOutCubic" }
+        "pace": {
+          "type": "string",
+          "enum": [
+            "calm",
+            "standard",
+            "brisk"
+          ],
+          "default": "standard"
+        },
+        "defaultTransition": {
+          "type": "string",
+          "default": "fade"
+        },
+        "transitionMs": {
+          "type": "integer",
+          "default": 600
+        },
+        "kenBurnsIntensity": {
+          "type": "number",
+          "default": 0.08,
+          "minimum": 0,
+          "maximum": 0.09,
+          "description": "Peak scale delta of the slow push. The safe areas in templates/scenes are drawn against the crop this produces \u2014 the browser-chrome frame's margin is fully spent at 0.0965 and the corner furniture at 0.111 \u2014 so 0.09 is the ceiling. 0.08 is the house default; motion.mjs clamps anything higher and says so."
+        },
+        "easing": {
+          "type": "string",
+          "default": "easeInOutCubic"
+        }
       }
     },
-
     "voice": {
       "type": "object",
       "description": "How the narration should sound and read.",
       "additionalProperties": false,
       "properties": {
-        "tone": { "type": "string", "description": "Free-text voice direction, e.g. 'plain-spoken, no hype, second person'." },
-        "provider": { "type": "string", "enum": ["say", "elevenlabs", "openai", "none"] },
-        "voiceId": { "type": "string" },
+        "tone": {
+          "type": "string",
+          "description": "Free-text voice direction, e.g. 'plain-spoken, no hype, second person'."
+        },
+        "provider": {
+          "type": "string",
+          "enum": [
+            "kokoro",
+            "say",
+            "elevenlabs",
+            "openai",
+            "none"
+          ],
+          "description": "kokoro = Kokoro-82M, local, Apache 2.0, no key and no per-character cost \u2014 the recommended default. say = macOS built-in (review cuts only; its voices are not cleared for commercial redistribution everywhere). elevenlabs/openai need a key. none = captions only."
+        },
+        "voiceId": {
+          "type": "string"
+        },
         "bannedWords": {
           "type": "array",
-          "items": { "type": "string" },
+          "items": {
+            "type": "string"
+          },
           "description": "Words the script must never use. Enforced by the copy check."
         },
         "spellings": {
           "type": "object",
           "description": "Forced spellings, e.g. product names with unusual casing.",
-          "additionalProperties": { "type": "string" }
+          "additionalProperties": {
+            "type": "string"
+          }
         }
       }
     },
-
     "assets": {
       "type": "object",
       "additionalProperties": false,
       "properties": {
-        "introVideo": { "type": "string", "description": "Optional pre-made branded intro sting, prepended verbatim." },
-        "outroVideo": { "type": "string" },
-        "backgroundImages": { "type": "array", "items": { "type": "string" } },
-        "watermark": { "type": "string", "description": "Corner bug shown for the whole video." },
-        "guidelinesDoc": { "type": "string", "description": "Path/URL to the brand guidelines the intake was filled from. Recorded for provenance." }
+        "introVideo": {
+          "type": "string",
+          "description": "Optional pre-made branded intro sting, prepended verbatim."
+        },
+        "outroVideo": {
+          "type": "string"
+        },
+        "backgroundImages": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        },
+        "watermark": {
+          "type": "string",
+          "description": "Corner bug shown for the whole video."
+        },
+        "guidelinesDoc": {
+          "type": "string",
+          "description": "Path/URL to the brand guidelines the intake was filled from. Recorded for provenance."
+        }
       }
     },
-
     "legal": {
       "type": "object",
       "additionalProperties": false,
       "properties": {
-        "attributionFooter": { "type": "string" },
-        "disclaimer": { "type": "string", "description": "Shown on the outro, e.g. a demo-footage notice." },
+        "attributionFooter": {
+          "type": "string"
+        },
+        "disclaimer": {
+          "type": "string",
+          "description": "Shown on the outro, e.g. a demo-footage notice."
+        },
         "demoFootageNotice": {
           "type": "boolean",
           "default": true,
-          "description": "When product footage comes from a generated demo rather than production, stamp a small notice. Defaults on — turning it off is a deliberate choice the operator makes, not a default."
+          "description": "When product footage comes from a generated demo rather than production, stamp a small notice. Defaults on \u2014 turning it off is a deliberate choice the operator makes, not a default."
         }
       }
     }

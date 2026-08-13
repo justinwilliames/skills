@@ -176,11 +176,32 @@ if have gh; then
   fi
 fi
 
+# Narration. Kokoro is the recommended provider: local, Apache 2.0, no key, and
+# no terms restricting commercial use of the audio — which `say` cannot promise.
+if [ -d "$SKILL_DIR/node_modules/kokoro-js" ]; then
+  ok "kokoro (local neural TTS, Apache 2.0 — recommended)"
+elif [ "$CHECK_ONLY" -eq 1 ]; then
+  warn "kokoro-js not installed"
+  note "npm install --prefix $SKILL_DIR kokoro-js   (~80MB model downloaded on first use)"
+else
+  warn "kokoro-js not installed — the best free narration option"
+  note "local neural TTS, Apache 2.0, no API key, no per-character cost"
+  note "pulls onnxruntime, so it is optional rather than a base dependency"
+  if confirm "npm install --prefix $SKILL_DIR kokoro-js"; then
+    ( cd "$SKILL_DIR" && npm install --no-audit --no-fund --loglevel=error --save-optional kokoro-js ) \
+      && ok "kokoro-js installed (model downloads on first synthesis)" \
+      || note "install failed — narration falls back to say/none"
+  else
+    note "skipped"
+  fi
+fi
+
 if [ "$OS" = "Darwin" ]; then
-  ok "say (macOS built-in narration — zero cost, no API key)"
+  ok "say (macOS built-in — fine for review cuts)"
+  note "its voices are not cleared for commercial redistribution everywhere; prefer kokoro for anything published"
 else
   warn "no built-in TTS on this platform"
-  note "set ELEVENLABS_API_KEY or OPENAI_API_KEY for narration, or use voice provider 'none' for captions only"
+  note "install kokoro-js above, or set ELEVENLABS_API_KEY / OPENAI_API_KEY, or use provider 'none' for captions only"
 fi
 
 printf '\n'
