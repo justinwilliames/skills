@@ -30,7 +30,21 @@ Everything task-specific — phases, IDs, paths, idempotency rules, approval gat
 how to do each step — lives in the task's **state file** and its **playbook**.
 A single generic resumer serves every registered task.
 
-`{base}` = this skill's directory (resolved automatically when the skill loads). Throughout, `WL={base}/scripts/worklog.sh` — the `{base}` placeholder resolves to the skill's absolute path, so `WL` always points to the correct worklog.sh regardless of where the skill is installed.
+`{base}` = this skill's directory (resolved automatically when the skill loads). The worklog script is at `{base}/scripts/worklog.sh`.
+
+**WRITE THAT PATH OUT IN FULL IN EVERY COMMAND. Never `WL=…; bash "$WL" …`.**
+
+This is not style. Claude Code matches permission rules against the command TEXT, and it does not expand shell variables — it cannot, since it never runs a shell to evaluate them. So the settings.json rule
+
+```
+Bash(bash /Users/<you>/.claude/skills/infinite-working-skill/scripts/worklog.sh:*)
+```
+
+matches `bash /Users/…/worklog.sh list-active` and does NOT match `bash "$WL" list-active`. This skill and its resumer used the variable form in all 18 of their documented commands, so the allow rule never fired once and every unattended run stopped on a permission prompt — which defeats the entire point of a skill whose job is to work while nobody is watching. Reported 2026-09-01: an unattended routine that prompted on every run.
+
+The tempting fix — adding `Bash(bash "$WL":*)` to the allowlist — is the wrong one, and deliberately not taken: it would let ANY future value of `$WL` run unprompted, which is a permission bypass wearing a convenience hat. The literal path is both the working fix and the safe one.
+
+Quoting the path (`bash "/Users/…/worklog.sh"`) also breaks the match. Leave it bare.
 
 ## When to use it
 
@@ -74,10 +88,10 @@ schedule a one-shot `fireAt` a few minutes after it.
 ## Setup (once per task)
 
 1. **State-file path** under the project, e.g. `<project>/.worklog/<task-id>.json`.
-2. **Init:** `bash $WL init <file> <task-id> "<title>"`
+2. **Init:** `bash /Users/<you>/.claude/skills/infinite-working-skill/scripts/worklog.sh init <file> <task-id> "<title>"`
 3. **Write the playbook** — a markdown file holding everything task-specific (per
    phase: what to do, exact paths/IDs, the idempotency check, approval gates).
-   Then point the state file at it: `bash $WL playbook-set <file> <playbook-path>`.
+   Then point the state file at it: `bash /Users/<you>/.claude/skills/infinite-working-skill/scripts/worklog.sh playbook-set <file> <playbook-path>`.
    This is what keeps the skill agnostic: a cold resumer reads the playbook, not
    the skill, to learn the task.
 4. **Configure** knobs (defaults shown):
@@ -86,15 +100,20 @@ schedule a one-shot `fireAt` a few minutes after it.
      race against the default wakeup cadence, so default to 1500 or higher.
    - `max_iterations=1000`, `max_consecutive_failures=4` — runaway guards.
    - `checkpoint_every_seconds=0` + `checkpoint_action="..."` — periodic save.
-5. **Declare phases:** `bash $WL phase-set <file> <id> <status> "[note]"`.
+5. **Declare phases:** `bash /Users/<you>/.claude/skills/infinite-working-skill/scripts/worklog.sh phase-set <file> <id> <status> "[note]"`.
 6. **Record approval gates** in the playbook AND as a state note: actions that
    must STOP for the user (post, send, delete prod, `git push`).
-7. **Register the task:** `bash $WL register <file>` (adds it to the registry the
+7. **Register the task:** `bash /Users/<you>/.claude/skills/infinite-working-skill/scripts/worklog.sh register <file>` (adds it to the registry the
    generic resumer scans).
 8. **Ensure the ONE generic resumer exists** — never create a per-task resumer:
    - `mcp__scheduled-tasks__list_scheduled_tasks` → if `infinite-working-skill-resumer`
      exists, reuse it (do nothing). Otherwise create it once with cron
      `17,47 * * * *` and the generic resumer prompt below.
+   - **If you created it, tell the user to click "Run now" once, now, while they are
+     still at the keyboard.** Approvals granted during a run are stored on the task and
+     auto-applied to later runs, so that one attended run is what makes every unattended
+     one silent. Skip it and the first thing the resumer does at 3am is wait for a human.
+     See "Permission prompts" below.
 9. **Start the loop:** do the first unit now, then follow the Turn protocol.
 
 ### Generic resumer prompt (create ONCE, serves every task — copy verbatim)
@@ -104,17 +123,19 @@ Generic resumer for the infinite-working-skill. COLD session — carry NO task
 assumptions. You resume ANY registered task; all task detail lives in each task's
 state file and the playbook it points to.
 
-WL=/Users/<you>/.claude/skills/infinite-working-skill/scripts/worklog.sh
+The worklog path is written out IN FULL below and must stay that way — permission
+rules match command text and do not expand shell variables, so a `WL=` shorthand
+makes every call prompt. See the skill's own note on this.
 
-1. bash "$WL" list-active            # lines: <task_id>\t<state_file>\t<status>
+1. bash /Users/<you>/.claude/skills/infinite-working-skill/scripts/worklog.sh list-active            # lines: <task_id>\t<state_file>\t<status>
    Empty -> nothing to do, exit.
-2. For EACH line, run: bash "$WL" should-resume "<state_file>"
-   - DONE    -> bash "$WL" unregister "<state_file>" ; continue.
+2. For EACH line, run: bash /Users/<you>/.claude/skills/infinite-working-skill/scripts/worklog.sh should-resume "<state_file>"
+   - DONE    -> bash /Users/<you>/.claude/skills/infinite-working-skill/scripts/worklog.sh unregister "<state_file>" ; continue.
    - BLOCKED -> continue (waiting on the user).
    - FRESH   -> continue (a live session is driving it; never double-drive).
    - RESUME  -> take over:
-       a. bash "$WL" heartbeat "<state_file>"          # claim it first
-       b. Read .playbook_path from the state file (bash "$WL" dump). Open that
+       a. bash /Users/<you>/.claude/skills/infinite-working-skill/scripts/worklog.sh heartbeat "<state_file>"          # claim it first
+       b. Read .playbook_path from the state file (bash /Users/<you>/.claude/skills/infinite-working-skill/scripts/worklog.sh dump). Open that
           playbook — it holds ALL task-specific steps, paths, idempotency rules,
           and approval gates.
        c. Invoke the infinite-working-skill and follow its Turn protocol + the
@@ -127,18 +148,47 @@ WL=/Users/<you>/.claude/skills/infinite-working-skill/scripts/worklog.sh
 4. If no registered task is `working`, you may disable this scheduled task.
 ```
 
+## Permission prompts — the two things that actually stop an unattended run
+
+A resumer that stops on a prompt is a resumer that does nothing, so treat a prompt as a
+bug in the setup rather than a fact of life. There are exactly two levers, and they cover
+different ground.
+
+**1. The allowlist must match the command TEXT.** Covered above: write the worklog path
+out in full, never through a variable, and never quoted. This is what makes the skill's
+OWN calls silent.
+
+**2. Per-task stored approvals, seeded by one manual run.** Approvals granted DURING a
+scheduled task's run are stored on that task and auto-applied to its future runs. This is
+the only thing that covers the tools the allowlist cannot sensibly enumerate in advance —
+remote connectors, browser control, an MCP server the playbook happens to need.
+
+So after creating or materially changing a scheduled task, **click "Run now" once while
+you are at the keyboard** and approve what it asks for. That single attended run is what
+buys every later unattended one. A task created and left to fire on its own cadence has
+no stored approvals at all, and the first thing it does at 3am is wait for a human.
+
+`create_scheduled_task` and `update_scheduled_task` take no permission-mode argument —
+checked, 2026-09-01 — so there is no way to declare "run this unattended" on the task
+itself. These two levers are the whole toolkit.
+
+**What not to do.** Do not widen the allowlist to a variable form (`Bash(bash "$WL":*)`),
+and do not set `permissions.defaultMode` to `bypassPermissions` globally to make one
+routine quiet. Both trade a narrow, auditable grant for an open one, and the second does
+it for every session on the machine, not just the routine that needed it.
+
 ## Turn protocol (every working iteration)
 
-1. `bash $WL heartbeat <file>` — **first thing**; claims the turn. On `TRIP`, set
+1. `bash /Users/<you>/.claude/skills/infinite-working-skill/scripts/worklog.sh heartbeat <file>` — **first thing**; claims the turn. On `TRIP`, set
    status blocked ("max_iterations"), notify, stop.
-2. `bash $WL status <file>` — read next_action, phases, ledger, playbook_path.
-3. **Idempotency check:** for the next unit, `bash $WL ledger-has <file> "<unit>"`.
+2. `bash /Users/<you>/.claude/skills/infinite-working-skill/scripts/worklog.sh status <file>` — read next_action, phases, ledger, playbook_path.
+3. **Idempotency check:** for the next unit, `bash /Users/<you>/.claude/skills/infinite-working-skill/scripts/worklog.sh ledger-has <file> "<unit>"`.
    HAS → skip. Only act on MISSING units.
 4. **Approval gate:** if the next action is gated (per the playbook), set status
    blocked "needs approval: <action>", PushNotification, stop. Do not perform it.
 5. Do the next unit. Success → `ledger-add` + advance phase/`next`. Failure →
    `fail`; on `TRIP` → status blocked, notify, stop.
-6. **Checkpoint:** `bash $WL checkpoint-due <file>`; if DUE, perform
+6. **Checkpoint:** `bash /Users/<you>/.claude/skills/infinite-working-skill/scripts/worklog.sh checkpoint-due <file>`; if DUE, perform
    `checkpoint_action`, then `checkpoint-done`.
 7. **Done?** All phases done → `set-status done`, `unregister`, PushNotification,
    stop. (Leave the shared resumer in place for other tasks.)
@@ -195,4 +245,4 @@ TaskStop any Monitor; omit ScheduleWakeup. State file + playbook remain as the r
 
 ## Sync homes
 
-Canonical: ~/.claude/skills/infinite-working-skill (private, live). Public sanitized twin: ~/code/claude-skills/infinite-working-skill → github.com/justinwilliames/claude-skills. Sanitization is a sync step — never push private paths/names.
+Canonical: ~/.claude/skills/infinite-working-skill (private, live). Public sanitized twin: ~/code/skills/infinite-working-skill → github.com/justinwilliames/skills. Sanitization is a sync step — never push private paths/names.
