@@ -22,6 +22,7 @@ reader's time.
 |---|---|---|
 | **Understatement adverbs** | "quietly powerful", "quietly shipped" | Delete the adverb, or state the actual magnitude |
 | **"Not X, but Y" scaffolding** | "It's not just a tool, it's a platform" | Say what it is, once |
+| **Balanced coda (any punctuation)** | "the calls came back, and so did the number" · "it's the exception: it's held until Friday" | Cover everything after the mark. No fact lost = cadence, cut it. The carrier (comma, colon, dash, semicolon) is not the rule — the shape is |
 | **Rule-of-three padding** | "faster, smarter, and more reliable" | Keep the one that's true and provable |
 | **Inflation words** | "delve", "crucially", "seamlessly", "game-changing", "supercharge" | Plain verb, plain claim |
 | **Symmetric hedging** | "While X has benefits, it also has drawbacks" | Take the position the evidence supports |
