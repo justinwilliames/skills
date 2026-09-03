@@ -41,7 +41,7 @@ The skill is designed to fire **at the start of every non-trivial task**, before
 3. **Fresh-window** — would a single deep task benefit from a fresh prompt cache + clean reasoning surface?
 4. **Parallelism** — are there 2+ independent units that could run concurrently?
 5. **Large surface** — does the chunk's read surface exceed ~150K tokens? If so, route it to a 1M Opus 5 subprocess (never the orchestrator seat).
-6. **Model fit** (only if 1–5 are all no) — does the task genuinely need Opus-level reasoning? If not, route to a 1-chunk Sonnet or Codex run for efficiency. If it sits in one of Fable 5's two narrow lanes (multi-day-autonomy stamina, hardest-repo judgment) *and* Opus 5 has visibly plateaued, escalate that sub-problem to a Fable delegate — a target, never the orchestrator seat. Since Opus 5, that escalation is a lateral trade, not an upgrade.
+6. **Model fit** (only if 1–5 are all no) — does the task genuinely need Opus-level reasoning? If not, route to a 1-chunk Sonnet or Codex run for efficiency. If it sits above Opus 5's band (long-horizon autonomy, hardest-repo judgment, a plateaued correctness cut), escalate that sub-problem to a **Fable 5.1** delegate. Fable sits above Opus in capability, so it is a real upgrade — but usage is metered and finite, so name the lane, and never spend it on mechanical, scoped, or replicated work.
 
 If any of 1–4 is yes, delegate. Even a 1-chunk run is worth it for fresh-window value alone — parallelism is one optimisation; fresh-context and model-fit are equally valid reasons to delegate. The Q6 check stops the main session burning Opus on mechanical work (renames, boilerplate, pattern-mirroring, lint/format fixes) that Sonnet handles better and cheaper.
 
@@ -83,7 +83,7 @@ Claude Code loads the skill automatically when you ask it to delegate or decompo
 ## How it works
 
 1. **Init** — fresh run dir at `$TMPDIR/delegate/<run-id>/`, with a compact `state.tsv` the orchestrator re-reads on demand.
-2. **Decompose** — Opus writes a manifest describing each chunk: id, intent, files_touched, runner, verification. On high-stakes cuts (ambiguous boundaries, large fan-out, tangled project), the orchestrator engages **ultrathink** before committing the manifest — a bad cut is the one error no downstream verification catches. Escalates to a Fable 5 Plan delegate only if ultrathink-on-Opus plateaus.
+2. **Decompose** — Opus writes a manifest describing each chunk: id, intent, files_touched, runner, verification. On high-stakes cuts (ambiguous boundaries, large fan-out, tangled project), the orchestrator engages **ultrathink** before committing the manifest — a bad cut is the one error no downstream verification catches. Escalates to a Fable 5.1 Plan delegate only if in-seat ultrathink plateaus — ultrathink is free, the Fable meter is not.
 3. **Validate + preflight** — schema check, file-collision check across chunks, and a guard against overwriting existing project files.
 4. **Confirm** — manifest shown; you approve.
 5. **Prepare workspaces** — each chunk gets a private `<chunk-id>/workspace/` directory to write into.
@@ -103,8 +103,8 @@ Every figure behind these calls lives in one dated block in `SKILL.md` → **Mod
 
 | Tier | Model | Used for |
 |------|-------|---------|
-| Orchestrator | Opus 5 (main session) | Planning, reviewing, QA, reporting |
-| Apex reasoning | Fable 5 (delegate target) | Fable's two surviving lanes — multi-day-autonomy stamina, hardest-repo judgment — never the orchestrator seat |
+| Orchestrator | Fable 5.1 while Fable budget lasts, else Opus 5 (main session) | Planning, reviewing, QA, reporting |
+| Apex reasoning | Fable 5.1 (seat while budget lasts; delegate target otherwise) | Above Opus 5's band — long-horizon autonomy, hardest-repo judgment, a plateaued correctness cut, a blocker tie-break. Metered: when it runs out, Opus 5 takes the seat and the lane closes |
 | Planning | Opus 5 (Plan subagent) | Manifest authoring for non-trivial decompositions |
 | Build | Opus 5 (Agent) — Sonnet 5 for wide fan-outs | Parallel implementation chunks |
 | Cheap parallel | Haiku 4.5 (Agent) | High-volume narrow text/data chunks (classify, convert, bulk edits) — a volume-and-latency play, never a cost one |
