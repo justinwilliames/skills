@@ -147,7 +147,7 @@ The orchestrator on resume should:
 
 | Trigger | Why subagents fail here | First-choice answer |
 |---------|------------------------|---------------------|
-| A single chunk needs >150K context | Subagent context is bounded by the orchestrator's allowance | **1M Opus CLI subprocess** (`opus-1m-cli`). Agent Teams only if that isn't enough or you need teammate-shaped coordination. |
+| A single chunk needs >150K context | Subagent context is bounded by the orchestrator's allowance | **1M Opus CLI subprocess** (`opus-1m-cli`) — probe its login first, the CLI authenticates separately from your session. Decompose if the lane is shut. Agent Teams only if that isn't enough or you need teammate-shaped coordination. |
 | A chunk needs project-scoped MCP servers the orchestrator lacks | Subagents inherit orchestrator MCP config | Agent Teams or CLI subprocess — both isolate MCP config |
 | A chunk needs different hooks (security policy, auto-format, permission scope) | Subagents share hooks with the orchestrator | Agent Teams or CLI subprocess |
 | The chunk could outlast the orchestrator's session limit | Subagents die when the orchestrator session dies | Agent Teams (independent lifetime) |

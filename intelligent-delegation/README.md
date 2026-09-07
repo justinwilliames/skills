@@ -106,11 +106,12 @@ Every figure behind these calls lives in one dated block in `SKILL.md` → **Mod
 | Orchestrator | Fable 5.1 while Fable budget lasts, else Opus 5 (main session) | Planning, reviewing, QA, reporting |
 | Apex reasoning | Fable 5.1 (seat while budget lasts; delegate target otherwise) | Above Opus 5's band — long-horizon autonomy, hardest-repo judgment, a plateaued correctness cut, a blocker tie-break. Metered: when it runs out, Opus 5 takes the seat and the lane closes |
 | Planning | Opus 5 (Plan subagent) | Manifest authoring for non-trivial decompositions |
-| Build | Opus 5 (Agent) — Sonnet 5 for wide fan-outs | Parallel implementation chunks |
-| Cheap parallel | Haiku 4.5 (Agent) | High-volume narrow text/data chunks (classify, convert, bulk edits) — a volume-and-latency play, never a cost one |
+| Build | Opus 5 (Agent) — Sonnet 5 for wide fan-outs only, for wall-clock not spend | Parallel implementation chunks |
+| Cheap parallel | Haiku 4.5 (Agent) — check its retirement date | High-volume narrow text/data chunks (classify, convert, bulk edits) — a volume-and-latency play, never a cost one |
 | Large-context | Opus 5 1M (CLI subprocess) | A single chunk with a >150K read surface — never the seat |
 | Integration | Opus 5 (main, in-line) | `runner: main` chunks — glue, cross-cutting edits |
-| Precision | Codex GPT-5.6 Sol | Deep work, adversarial review, second opinions |
+| Precision / review | Codex GPT-6 Astra (Sol for a second model family, GPT-5.5 as fallback) | Adversarial review, deep algorithms, second opinions |
+| Screen-driving | Codex GPT-6 Astra, Terra as fallback | Long terminal/tool-loop and computer-use chunks — pin an effort, Astra defaults to the lowest |
 | Lookup | Haiku 4.5 (Explore subagent) | File search, symbol lookup |
 
 Full decision tree and the seat-topology argument: [`references/routing.md`](references/routing.md)

@@ -1,6 +1,14 @@
 ---
 name: intelligent-delegation
-description: PRIORITISE at the START of EVERY new session, EVERY non-trivial task, AND EVERY follow-up turn that adds scope, pivots topic, or reveals unexpected complexity — BEFORE reading files, spawning Explore subagents, or implementing anything. Run the 6-question triage: scope / context / fresh-window / parallelism / large-surface-1M / model-fit. If any fires, delegate — fan out to Opus/Sonnet/Haiku/Codex subagents, route a >150K read surface to a 1M subprocess, escalate a named-lane sub-problem to Fable; only stay in-session when none fire AND Opus-5-level reasoning is genuinely required. Default aggressive — when in doubt, re-triage. Always fires on 'delegate', 'fan out', 'parallel build', 'decompose this task', 'hand off to codex', or a multi-part build request. Mandatory re-triage on scope additions ('also do X', 'and now Y', 'next, can you...', 'while you're at it'), topic pivots, replicated work ('apply the same to Y'), session-handoff resumptions, post-compaction turns, or any 'this is bigger than I thought' moment. Reactive fallbacks: 2+ files already read this turn, 2+ independent files/features/deliverables in the request, or about to read a 3rd file. Skip ONLY for: conversational replies, status questions answerable from memory/git/a single tool call, single-line single-symbol edits, or one-file one-read lookups.
+description: >
+  Triage non-trivial tasks for delegation before implementation. Use at the start
+  of a complex task and re-run when scope expands, the topic pivots, work can run
+  independently, the read surface is large, or another model is a better fit.
+  Trigger explicitly on "delegate", "fan out", "parallel build", "decompose this
+  task", "hand off to Codex", multi-part builds, or follow-ups such as "also do
+  X" and "apply the same to Y". Evaluate scope, context, fresh-window needs,
+  parallelism, large-surface handling, and model fit. Skip conversational
+  replies, simple status checks, single-line edits, and one-file lookups.
 allowed-tools: Bash, Read, Grep, Glob, Write, Edit, Agent, TaskOutput
 ---
 
@@ -80,6 +88,26 @@ This makes the orchestration call visible without bloating the response. The use
 
 **Why this matters.** The most common delegation failure mode is not "ran triage and got it wrong" — it's "didn't re-run triage when the work grew." A session that started as a single-file edit and accumulated five follow-up additions ends up doing fan-out-shaped work inside one context window, badly. Re-triage cuts that off at every checkpoint.
 
+## Routing objective — QUALITY-FIRST (standing directive, set 2026-07-14)
+
+This skill assumes a subscription with ample included usage. **Cost is NOT a routing input.** Route on capability-fit, latency, and model-diversity only. Every "cheaper / save tokens / efficiency" rule in this file is subordinate to this section; pricing notes remain for intuition only.
+
+**What changes under quality-first:**
+
+- **Build chunks default to Opus 5, not Sonnet — and the cost argument for Sonnet is now dead on the evidence.** Sonnet 5's measured cost per index task is within a few cents of Opus 5's, because it burns far more tokens to get there (**Model Facts**). So drop to Sonnet (latest tier — currently Sonnet 5) only for wide fan-outs (>~6 parallel chunks) of tightly-specified, easily-verified chunks where **wall-clock and rate headroom** genuinely matter. "To save Opus" was always banned as a quality rule; it is now also simply false.
+- **Haiku's lane shrinks to volume + latency.** High-volume (>10 units) trivially-verifiable classify/enrich/smoke fan-outs where speed dominates. Anything judgment-adjacent goes to Sonnet or Opus. Haiku is never a cost play now.
+- **Fable 5.1 is the apex tier again — and the constraint moved from capability to the meter.** Claude Fable 5.1 is the newest Claude 5 model, Mythos-class, generally available, and above Opus 5 in capability (**Model Facts**). Escalating to Fable is a genuine upgrade, not the lateral trade Fable 5 had become. What gates it now is that **Fable usage is metered and runs out** — so route `fable-subagent` where the chunk is genuinely above Opus 5's band, and nowhere else. See "Fable budget" and "Fable 5.1 routing".
+- **Step 10.5 dual review fires more readily** — when in doubt, run it. Reviewer A is an Opus 5 subagent; spend a Fable reviewer only where the applied run itself sits above Opus 5's band.
+- **Seat: Fable 5.1 while Fable budget lasts, Opus 5 once it is exhausted.** Orchestration is the highest-leverage surface in a run — a bad cut or a wrong reconciliation is the error no `verification` command catches — so the apex tier earns the seat while the meter allows it. When Fable runs out, Opus 5 takes the seat and nothing else changes: no part of the triage, the manifest contract, or the QA gates depends on Fable being available. Never downgrade below Opus 5 mid-session.
+
+**What does NOT change (these were never cost rules):**
+
+- Terra ban for review (measured recall regression); the account-availability check before any Codex route; the reward-hacking QA rule.
+- No Haiku for code chunks — always was a quality rule.
+- Extended-thinking caution on intuitive tasks (measured regression).
+- Lean orchestrator seat / 1M-as-target-never-seat (reasoning-quality + cache, not price).
+- Decomposition beats brute-force context.
+
 ## Model Routing — the tier table
 
 | Tier | Model | Session | Use for |
@@ -87,34 +115,53 @@ This makes the orchestration call visible without bloating the response. The use
 | **Orchestrator** | **Fable 5.1 (`claude-fable-5-1`, main session) while Fable budget lasts; Opus 5 (`claude-opus-5`, adaptive `xhigh` thinking) once it is exhausted** | Stays | Decompose, review diffs, QA, reconcile dual-model reviews, talk to the user |
 | **Apex reasoning** | **Fable 5.1 (`Agent(model="fable")`, or CLI subprocess for 1M)** | Subagent / subprocess (fresh) | The class of sub-problem above Opus 5's band: long-horizon autonomy, hardest-repo judgment, a correctness cut where Opus 5 has plateaued, blocker-conflict tie-break. Metered — spend it under "Fable budget". See "Fable 5.1 routing" below. |
 | **QA reviewer A** | Opus 5 (fresh subagent) | Subagent | Cold semantic review of an applied major run (Step 10.5) |
-| **QA reviewer B** | Codex GPT-5.5 `--effort high` | Background | Adversarial review of an applied major run, parallel to reviewer A (Step 10.5). Cross-*family* diversity at near-apex depth — Fable is cross-*depth*, not diversity. Never Terra for review (measured recall regression — **Model Facts**). |
+| **QA reviewer B** | **Codex GPT-6 Astra** `--effort high` (Sol for a second family; `gpt-5.5` if neither serves) | Background | Adversarial review of an applied major run, parallel to reviewer A (Step 10.5). Cross-*family* diversity at near-apex depth — Fable is cross-*depth*, not diversity. Never Terra for review (measured recall regression — **Model Facts**). |
 | **Planning** | Opus 5 (Plan subagent) | Subagent | Architecture, multi-file refactor design. Exhaust in-seat ultrathink first; a Fable Plan delegate is for a genuinely research-grade cut, and it spends metered budget. |
-| **Build** | Opus 5 (`opus-subagent`) when build quality dominates; Sonnet 5 (`sonnet-subagent`) for wide, tightly-specified fan-outs where wall-clock and cost matter | Fresh per chunk | Parallel independent implementation chunks (multi-file, project-conventions-aware) |
-| **Precision** | Codex GPT-5.5 | Background | Adversarial review, deep algorithms, second opinions, long terminal/tool-loop agentic chunks (Sol's measured lane) |
-| **Large-context** | **Opus 5 1M (native 1M window; via CLI subprocess to keep it off the orchestrator seat)** | Subprocess (fresh session) | Single chunks whose *read surface* exceeds ~150K tokens: monorepo-wide review, big PDF/transcript ingest, multi-hundred-file analysis, log forensics. Never the orchestrator seat. |
-| **Cheap parallel** | Haiku 4.5 (Agent, `model="haiku"`) | Fresh per task | High-volume narrow tasks at scale: classify/tag, format-convert, bulk mechanical text edits, smoke checks, per-row enrichment |
+| **Build** | **Opus 5 (`opus-subagent`) — quality-first default.** Sonnet (latest) for wide, tightly-specified fan-outs where wall-clock matters | Fresh per chunk | Parallel independent implementation chunks (multi-file, project-conventions-aware) |
+| **Precision** | Codex GPT-5.6 Sol (fallback `gpt-5.5`) | Background | Adversarial review, deep algorithms, second opinions. Long terminal/tool-loop *screen-driving* chunks go to `gpt-5.6-terra` via `codex-cu.sh` — and to `gpt-6-astra` once the account serves it |
+| **Large-context** | **Opus 5 1M (native 1M window; via CLI subprocess to keep it off the orchestrator seat)** — ⛔ **probe the CLI login first**, it is a separate auth from your session and was NOT logged in on 2026-09-07 | Subprocess (fresh session) | Single chunks whose *read surface* exceeds ~150K tokens: monorepo-wide review, big PDF/transcript ingest, multi-hundred-file analysis, log forensics. Never the orchestrator seat. |
+| **Cheap parallel** | Haiku 4.5 (Agent, `model="haiku"`) — check its retirement date before building on it | Fresh per task | High-volume narrow tasks at scale: classify/tag, format-convert, bulk mechanical text edits, smoke checks, per-row enrichment |
 | **Lookup** | Haiku 4.5 (Explore subagent) | Subagent | File location, grep-for-symbol, quick searches |
 | **Integration** | Opus 5 (main session, in-line) | Stays | runner: `main` chunks — cross-cutting edits, package.json, config wiring, glue between sibling chunks |
 
 Full decision tree with per-tier rationale: `references/routing.md`. Every number behind these calls: **Model Facts**, below.
 
-Use `runner: main` sparingly — typically the final chunk in a chain when integration genuinely requires orchestrator context (sibling-chunk awareness, cross-file decisions). Most code chunks are `opus-subagent` (best per-chunk quality) or `sonnet-subagent` (wide, tightly-specified fan-outs — cheaper and faster) or `haiku-subagent` for high-volume trivially-verifiable text/data work.
+Use `runner: main` sparingly — typically the final chunk in a chain when integration genuinely requires orchestrator context (sibling-chunk awareness, cross-file decisions). Most chunks should be `opus-subagent` for code work (quality-first default; `sonnet-subagent` for wide, tightly-specified fan-outs) or `haiku-subagent` for high-volume trivially-verifiable text/data work.
 
-### Codex tier rules (GPT-5.6 family — figures in **Model Facts**)
+### Codex tier rules (GPT-5.6 / GPT-6 family — figures in **Model Facts**)
 
-- **⛔ ROUTE ONLY TO MODELS THE ACCOUNT CAN SERVE — check before you route.** The authoritative list is `~/.codex/models_cache.json` (`slug` fields); `codex login status` does NOT tell you this. On 12 Aug 2026 **`gpt-5.6-sol` stopped being servable** on a ChatGPT-account auth, and every Sol-pinned call 400s: *"The 'gpt-5.6-sol' model is not supported when using Codex with a ChatGPT account."* Worse, under `codex-cu.sh` that 400 lands **after** the Computer Use app has opened, so it reads like a screen-capture or permissions failure and sends you debugging the wrong layer. If a Codex run returns no real answer, **grep the log for `is not supported` and `token_invalidated` before touching anything else.**
-- **Current allowed set** (verify, don't trust this line — the cache is the source of truth): `gpt-5.5` · `gpt-5.6-terra` · `gpt-5.6-luna` · `gpt-5.4-mini`.
-- **`gpt-5.5` is the default routing target** — the frontier tier still on the account ("complex coding, research, and real-world work"). It takes the lane Sol held: adversarial review, deep algorithms, cross-family second opinions.
-- **`gpt-5.6-terra` is the agentic/screen-driving target**, and is what `codex-cu.sh` defaults to. Terra's documented weakness is **review recall**, which is a different job from driving a UI — do not let that caveat push CU work onto a model not built for agentic loops. Still never route Terra to adversarial review while `gpt-5.5` exists.
+- **⛔ ROUTE ONLY TO MODELS THE ACCOUNT CAN SERVE — check before you route.** The authoritative list is `~/.codex/models_cache.json` (`slug` fields); `codex login status` does NOT tell you this. Account availability **moves in both directions**: `gpt-5.6-sol` vanished from the account on 12 Aug 2026 and was **back and serving on 4 Sep 2026** (probed: `codex exec -m gpt-5.6-sol` returned a clean answer). Re-read the cache; never route off a remembered ban.
+- **The 400 does not mean the model exists.** An unservable slug 400s with *"The '<slug>' model is not supported when using Codex with a ChatGPT account."* — and so does a slug that was never real: `gpt-6-fake-nonexistent` returns that identical message (probed 4 Sep 2026). The error tells you *"not on this auth"*, nothing more. **Existence is proved by the cache, not by the error string.** Worse, under `codex-cu.sh` that 400 lands **after** the Computer Use app has opened, so it reads like a screen-capture or permissions failure and sends you debugging the wrong layer. If a Codex run returns no real answer, **grep the log for `is not supported` and `token_invalidated` before touching anything else.**
+- **Current allowed set** (verify, don't trust this line — the cache is the source of truth; cache read 7 Sep 2026): `gpt-6-astra` · `gpt-5.6-sol` · `gpt-5.6-terra` · `gpt-5.6-luna` · `gpt-5.5` · `gpt-5.4-mini`. `gpt-5.4` dropped off between 4 and 7 Sep; `gpt-6-astra-aeon` is still not entitled.
+- **`gpt-5.6-sol` serves again and holds the deep-algorithm and second-opinion lane.** Adversarial *review* moved to Astra on 7 Sep 2026 (see the Astra bullet) — Sol is now the second model family on a diff, not the first choice. **`gpt-5.5` is the fallback** and becomes the target the moment a Sol call 400s.
+- **GPT-6 Astra (`gpt-6-astra`) — LIVE on this account since 7 Sep 2026** (probed serving; cache lists it at priority 1). It takes the `codex-cu.sh` **screen-driving and terminal-grind lane off Terra**, where it clears Sol by a wide margin (**Model Facts**). It also takes the **adversarial-review lane off Sol** — corrected 7 Sep 2026 against the only published head-to-head, where Astra leads Sol on actionable bug coverage, and leads it by a wide margin on *cross-file* findings specifically (**Model Facts**). Sol stays as the second opinion when you want a different model family on the same diff. What Astra takes **nothing** of is **judgment and planning**: on general intelligence it is *level with Opus 5*, not above it, and it publishes no repo-judgment number at all. Route it on the lane, not on the launch headline.
+- **⚠️ Astra defaults to `low` effort — always pin one.** The cache's `default_reasoning_level` for Astra is `low` (every other Codex model defaults `medium`). Routing a hard chunk to "the best model" and omitting `-c model_reasoning_effort` gets you the flagship thinking as little as it is allowed to. Every Astra call in this skill passes an explicit effort.
+- **The version gate — a third 400 message, and the useful one.** Astra 400'd on 4 Sep with *"not supported when using Codex with a ChatGPT account"* and on 7 Sep with *"requires a newer version of Codex. Please upgrade to the latest app or CLI."* **Read the message, not the status code:** "not supported" = no entitlement (or a fake slug); **"requires a newer version" = the entitlement has landed and the CLIENT is the blocker.** Upgrading codex-cli unlocked it the same minute. Corollary: **the cache lags entitlement** — Astra was absent from it while already entitled, so the cache is a floor, not a ceiling. Probe when a slug matters.
+- **nvm double-install trap.** `npm i -g @openai/codex` installs per *node version*. After the 7 Sep upgrade the machine held codex-cli 0.153.4 under node v20 and a stale 0.144.1 under node v24 — and the stale one fails Astra with the version-gate 400 that reads like an entitlement problem. Upgrade under **every** node version that has a `codex` binary, or a shell that switches node silently loses the model.
+- **`gpt-5.6-terra` is the agentic/screen-driving target**, and is what `codex-cu.sh` defaults to. Terra's documented weakness was **review recall**, which is a different job from driving a UI — do not let that caveat push CU work onto a model not built for agentic loops. Still never route Terra to adversarial review while Astra, Sol or `gpt-5.5` serve.
 - **Luna duplicates Haiku's lane** cross-family; `gpt-5.4-mini` is the cheap tier. Neither is a quality-first target — Claude tiers keep those lanes.
-- **Sol's lane is the terminal/tool-loop agentic grind**, plus cross-family review diversity. Since Opus 5 it is a *legitimate target*, not a clear upgrade over keeping the chunk on Opus — route on the lane (grind vs judgment), never on a decimal.
-- **Reward-hacking caveat (load-bearing).** METR measured Sol with the highest detected reward-hacking rate of any public model they've assessed. Never accept a Sol chunk's self-reported pass — the orchestrator's own Step 10 QA run is the only evidence that counts. (True for every runner; Sol earns the explicit call-out.)
+- **⛔ Luna's advertised context is not usable context.** It ships the same ~1M window as Sol and Terra and recalls **under half of it** on long-context retrieval, where its siblings clear 89% (**Model Facts**). Never route a repo-wide read, a long transcript, or any multi-document synthesis to Luna, whatever its coding scores say. Short, self-contained chunks only.
+- **Two hidden slugs serve but get NO lane — deliberately.** `gpt-reserve` and `codex-auto-review` both answer a probe (7 Sep 2026) despite `visibility: hide` in the cache. They are not undiscovered capacity: `gpt-reserve` is described as a fast, affordable agentic model, i.e. Luna's lane again, and `codex-auto-review` is Codex's own internal approval-review model, not a general-purpose target. Recorded here so a future session that finds them in the cache does not read the silence as an oversight and route to them.
+- **Route on the lane (grind vs judgment), never on a decimal.** Since Opus 5, a Codex chunk is a *legitimate target*, not an automatic upgrade over keeping it on Opus.
+- **Reward-hacking caveat (load-bearing, and now live again).** METR measured Sol's detected cheating rate as **higher than any public model they had evaluated** — and Sol is back on the account, so this is an operating rule, not a historical note. Treat the whole family as suspect on self-report.
+- **⛔ Unattended, test-graded work does NOT go to Codex.** Where a test suite or checker is both the goal and the judge, and no human reads the diff before it lands, route to Opus 5 — the grader is precisely the thing this family is measured gaming. This is a hard rule, not a preference. A Codex chunk whose result a human or the orchestrator's own Step 10 QA actually inspects is fine; that inspection is the whole mitigation. Never accept a Codex chunk's self-reported pass — the orchestrator's own Step 10 QA run is the only evidence that counts.
 - **Tier suffix is mandatory** — bare `gpt-5.6` is accepted by the CLI but rejected by the API. GPT-5.5 stays available as the fallback if 5.6 misbehaves.
-- **`ultra` is not a reasoning tier** — it's a CLI-level switch that spawns Codex's own subagent fan-out. Banned *inside delegate-run chunks* (it double-orchestrates against the manifest contract — a structural ban, not a quality judgment); permitted for standalone wholesale Codex tasks where Codex owns the whole job.
+- **`ultra` changed meaning on Astra — re-probed 7 Sep 2026.** On the GPT-5.x models it was a CLI-level switch, not a reasoning level. On Astra it is **both**: the cache lists `ultra` as a supported reasoning level described as *"Maximum reasoning with automatic task delegation"*, and it runs (probed). So on Astra it buys depth **and** fan-out, where on GPT-5.x it bought only fan-out. The structural ban is unchanged and unaffected: banned *inside delegate-run chunks*, because `multi_agent_version: v2` means it spawns its own agents against the manifest contract — a contract rule, not a quality judgment. Outside a delegate run it is **permitted but gated** — see the ultra gate below.
+
+#### The `ultra` gate — earn it or don't fire it
+
+**On GPT-5.x, `ultra` buys *parallelism*, not depth** — reaching for it on work that isn't fan-out-shaped pays a fan-out's cost for a single agent's result, and hands the coordination to an orchestrator you can't see or verify. **On Astra it buys both** (max reasoning *plus* automatic delegation), so the "wrong axis" argument below does not apply there — but the verification argument hardens, because you are now trusting an unseen fan-out *and* a model family with a measured reward-hacking problem. **All four must hold:**
+
+1. **Standalone** — Codex owns the whole job end-to-end; no manifest, no delegate run, no chunk contract for it to fight.
+2. **Genuinely fan-out-shaped** — 3+ units that are *independent* (separate files, targets, or cases). If you can't name the units, it isn't fan-out-shaped and the switch does nothing but spend.
+3. **Too wide for one agent** — the read/edit surface genuinely exceeds what a single `xhigh` Codex pass handles well. A wide sweep, a repo-scale migration, a multi-target audit.
+4. **Verifiable from outside** — you hold a check that judges the *result* (test run, build, diff review) without trusting Codex's internal reports. The reward-hacking caveat above hardens here: `ultra` multiplies the number of self-reports you must not believe.
+
+**Fails the gate → use `--effort xhigh`/`max` instead.** Single-file work, adversarial review of one file, a narrow precision fix, a deep-but-narrow algorithm, "let's be thorough" — every one of these is a depth need, and `max` supplies depth on every model in the family without buying an invisible fan-out with it. On GPT-5.x that is because `ultra` moves only the parallelism axis; on Astra it is because `ultra`'s *extra* over `max` is the delegation, and delegation is precisely what a narrow task does not need.
 
 ## Model Facts — every number that ages, in one place
 
-> **Verified 2026-09-03** (lineup refreshed for Claude Fable 5.1). This is the **only** place in this skill — SKILL.md *and* every file under `references/` — that carries a figure which ages: benchmarks, prices, context windows, cutoffs, measured regressions. Everywhere else names *lanes and rules*, never numbers. When a model lands or a benchmark moves, re-verify **here and nowhere else**; a figure found outside this block is drift — delete it, don't update it. Enforced by `scripts/check-model-facts.sh` — run it after any model-layer edit.
+> **Verified 2026-09-07** — full two-family benchmark re-sweep, every figure re-taken from a fetched primary page. Several long-standing rows were found to be UNSOURCED and have been removed rather than updated; the removals are recorded below because a deleted number that quietly returns is the failure this block exists to prevent. (GPT-6 Astra now servable — context window, effort ladder and defaults re-taken from the local models cache, which disagrees with the launch coverage. `gpt-5.6-sol` availability re-probed 2026-09-04; Claude lineup refreshed for Fable 5.1 on 2026-09-03). This is the **only** place in this skill — SKILL.md *and* every file under `references/` — that carries a figure which ages: benchmarks, prices, context windows, cutoffs, measured regressions. Everywhere else names *lanes and rules*, never numbers. When a model lands or a benchmark moves, re-verify **here and nowhere else**; a figure found outside this block is drift — delete it, don't update it. Enforced by `scripts/check-model-facts.sh` — run it after any model-layer edit.
 >
 > Prices are written without dollar signs (a literal `$N` gets argument-substituted when this skill is invoked with args) and are **intuition only — cost is not a routing input**.
 
@@ -127,8 +174,9 @@ Use `runner: main` sparingly — typically the final chunk in a chain when integ
 | **Mythos 5.1** | `claude-mythos-5-1` | 1M | 128K | 10/50 | — | The same underlying model as Fable 5.1 — same capabilities, pricing, and API surface — available only to approved organisations. Not a routing target unless the account has it. |
 | ~~Fable 5~~ | `claude-fable-5` | 1M | 128K | 10/50 | Jan 2026 | Superseded by Fable 5.1 in the same tier at the same per-token price. Still served; no remaining lane in this skill. |
 | **Sonnet 5** | `claude-sonnet-5` | 1M | 128K | 3/15 (2/10 intro thru 2026-08-31) | — | Adaptive thinking, no extended thinking. |
-| **Haiku 4.5** | `claude-haiku-4-5-20251001` | 200K | 64K | 1/5 | — | Only current model still on classic extended thinking rather than effort/adaptive. |
-| **Codex GPT-5.6 Sol** (⛔ no longer servable on ChatGPT-account auth as of 12 Aug 2026 — benchmark rows kept as historical record; route to `gpt-5.5`) | `gpt-5.6-sol` | 1M | 128K | 5/30 | — | Subscription-billed in practice. Terra 2.50/15 and Luna 1/6 exist but are not routed to. |
+| **Haiku 4.5** | `claude-haiku-4-5-20251001` | 200K | 64K | 1/5 | Feb 2025 reliable (Jul 2025 training) | Only current model still on classic extended thinking rather than effort/adaptive — **it has no `effort` parameter at all**, which breaks any scheme that tunes effort per chunk. ⚠️ **Retirement commitment expires 2026-10-15** — the shortest-lived model in the lineup; re-check before building anything durable on it. |
+| **Codex GPT-5.6 Sol** | `gpt-5.6-sol` | 1M | 128K | 5/30 | — | **Available again on the account — probed serving 2026-09-04** (it had 400'd since 12 Aug 2026). Default Codex routing target; `gpt-5.5` is the fallback. Re-probe rather than trusting this row — availability has flipped twice. |
+| **Codex GPT-6 Astra** | `gpt-6-astra` | **272K default / 872K max** via Codex CLI (launch coverage quotes 1,050,000 for the raw API — the CLI cache is what governs a `delegate.sh` chunk, so route on 272K) | 128K | 10/50 | — | Launched 2026-09-03; **servable on this account from 2026-09-07** (probed), cache priority 1. **`default_reasoning_level` is `low`** — always pin an effort. Ladder: `low`→`max` **plus `ultra`** ("maximum reasoning with automatic task delegation", `multi_agent_version: v2`, `multi_agent_reasoning_effort: xhigh`). Fast tier 2× speed at 2× price. `gpt-6-astra-aeon` exists as a slug but is **not entitled** on this account. |
 | ~~Opus 4.8~~ | `claude-opus-4-8` | 1M | 128K | 5/25 | — | **Retired from this skill.** Superseded by Opus 5 at identical price, better on every published benchmark. No remaining lane. |
 
 **Benchmarks that drive the routing calls** (max-reasoning configurations)
@@ -137,8 +185,8 @@ Use `runner: main` sparingly — typically the final chunk in a chain when integ
 
 | Signal | Opus 5 | Fable 5 (superseded) | Codex Sol | Consequence |
 |--------|--------|----------------------|-----------|-------------|
-| AA Intelligence Index | **61** (#1 of 190) | 60 | 59 | Historical — Opus 5 vs Fable **5** |
-| SWE-bench Verified | **~96–97%** | ~95% | — | Historical — Opus 5 vs Fable **5** |
+| AA Intelligence Index | **REMOVED — unsourced** | — | — | AA publishes conflicting values per model across its own surfaces; see the AA instability note below |
+| SWE-bench Verified | **REMOVED — unsourced** | — | — | Not published for ANY frontier tier; see the SWE-bench note below |
 | SWE-bench **Pro** (hardest repo judgment) | behind | **~80%** | 64.6% | Hardest-repo judgment is a Fable lane |
 | Frontier-Bench v0.1 (agentic coding) | **43.3%** | 33.7% | — | Historical — Opus 5 vs Fable **5** |
 | GDPval-AA (Elo) | **1861** | 1747 | — | Historical — Opus 5 vs Fable **5** |
@@ -149,6 +197,29 @@ Use `runner: main` sparingly — typically the final chunk in a chain when integ
 | Longest-horizon autonomy | behind | **ahead** | — | Long-horizon autonomy is a Fable lane |
 | Adversarial review recall | — | — | Sol **+7.4pp** vs 5.5, ~32% precision; **Terra −8.6pp** | Sol-only review lane; expect noise, reconcile it |
 | Long-horizon efficiency | — | — | Sol 63.7% @ ~21K out; **Terra 40.7% @ ~55K** | Terra ban |
+
+**GPT-6 Astra — the measured picture (2026-09-04)**
+
+| Signal | GPT-6 Astra | Comparator | Consequence |
+|--------|-------------|------------|-------------|
+| AA Intelligence Index (max) | **61** (#8 / 202) | Opus 5 **61** | Level with Opus 5, not above it. Astra is **not** a judgment-tier upgrade. |
+| OSWorld 2.0 (computer use) | **72.6%** (offline set, ~40 min/task) | Opus 5 70.57% · Sol 65.7% | Best computer-use number on the board — the screen-driving lane, once servable. |
+| Terminal-Bench 4.0 | **57.7%** | Sol 37.3% | Wide terminal-grind margin. ⚠️ **v4.0 — not comparable to the v2.1 rows above.** Never cross-read the two. |
+| DeepSWE v1.1 | 74.1% | — | No comparator measured here; not a routing input on its own. |
+| GPQA (verified) | 96.0% | — | Knowledge, not agentic capability. Not a routing input. |
+| SWE-bench Verified / Pro | **not published** | — | The absence is the point: no evidence Astra beats Opus 5 or Fable on repo judgment. Do not assume it. |
+| Usable read surface (CLI) | **272K** default, 872K max | Opus 5 1M | Astra is **not** the large-surface tool. A >150K chunk still routes to `opus-1m-cli`; anything near 272K on Astra risks truncation (`truncation_policy` trims tool output at 10K tokens). |
+| ARC-AGI-3 headline | 99.9% provider adapter / **62.7% standard harness** | — | 37.2pp apart on the same model — the adapter preserves opaque reasoning state between requests and compacts context. The launch table carries the 99.9%. **Route on 62.7%.** |
+| Adversarial review — actionable bug coverage | **61.3%** overall, **57.1%** cross-file | Sol 59.0 / 47.6 · Opus 5 50.2 / 42.9 | Astra leads, and the cross-file gap over Sol is ~9.5pp. Single vendor (CodeRabbit), bespoke ~100-pattern harness, and it reports *coverage* — recall, precision and FPR are published for no model at all. It is the only head-to-head that exists, so the review lane follows it. |
+
+**Two figures were REMOVED from this block on 2026-09-07, not updated. Do not reinstate either without a fetched primary page.**
+
+- **SWE-bench Verified is not published for any frontier tier.** Neither Anthropic's Opus 5 nor its Fable 5.1 announcement carries one; nor does the Astra launch, nor the GPT-5.6 family. The figures circulating on aggregator blogs (~95–97% for Opus 5 / Fable 5.1, and four mutually inconsistent numbers for Sonnet 5) trace to no primary source. **The only clean vendor-published figure in the whole lineup is Haiku 4.5 at 73.3%** — 50 trials, a two-tool bash-plus-edit scaffold, default sampling, no test-time compute. It is the most trustworthy single number here, and it belongs to the cheapest model. Related: no Claude 5-generation model appears on Scale's public SWE-bench **Pro** board either, which tops out at Opus 4.6; every Pro figure quoted for a Claude 5 tier is vendor self-report.
+- **The AA Intelligence Index is unstable across AA's own surfaces.** GPT-5.6 Sol reads 51, 59 or 61 depending which of three AA pages you open; Claude Sonnet 5 moves from 45 (#38/202) on its model page to 53 (#5) in its launch article. Index versions rebase without renaming. **Use the rank ordering as the signal and cite the live model page; never quote the absolute as though it were stable.**
+- **Terminal-Bench is three benchmarks sharing one name.** Versions 2.0, 2.1 and 4.0 are all in current marketing. GPT-5.6 Sol scores **88.8% on 2.1 and 37.3% on 4.0**; Fable 5.1 scores **91.4% on 2.1 and 55.8% on 4.0**. A cross-version comparison is worth ~35-50 points of pure artefact. Always carry the version; refuse to compare without it.
+- **Sonnet 5's cost advantage does not survive measurement.** Cost per AA Intelligence Index task: Sonnet 5 **$2.29**, Opus 5 **$2.34** — Sonnet's cheaper tokens are cancelled by burning far more of them. Route Sonnet for wall-clock and rate headroom, never for spend.
+- **Luna's usable context is far below its advertised window.** MRCR long-context recall: Sol **91.5%**, Terra **89.6%**, **Luna 41.3%** — on the same ~1M window. See the Luna rule in Codex tier rules.
+- **Only one model in the lineup has a METR evaluation: GPT-5.6 Sol.** 50%-time-horizon "around 11.3hrs (95% CI: 5hrs – 40hrs)", and METR states plainly that it does not consider these a robust measurement. The same report is the source of the reward-hacking rule. **No METR evaluation exists for GPT-6 Astra.**
 
 > **Snapshot caution.** The AA Coding Agent Index is re-scored as models are added — two fetches in July 2026 returned different absolutes for the same models. Treat every figure here as dated. Route on the *lane*, not the decimal.
 
@@ -164,7 +235,7 @@ Use `runner: main` sparingly — typically the final chunk in a chain when integ
 
 - **Opus 5:** no assistant prefill (400) • `thinking:{type:"disabled"}` is valid **only at effort `high` or below** — pairing it with `xhigh`/`max` returns 400 • adaptive thinking runs by default when `thinking` is omitted • cyber/bio safety classifiers mean a declined request returns HTTP 200 with `stop_reason:"refusal"` and a `stop_details.category`, not an exception — branch on `stop_reason` before reading `content`; the `fallbacks` beta auto-reruns on a fallback model.
 - **Fable 5.1 (and Mythos 5.1):** thinking is always on — omit `thinking` entirely; both `{type:"disabled"}` and `{type:"enabled",budget_tokens:N}` return 400 • forced tool use (`tool_choice` `any`/`tool`) returns 400 — use `auto` plus an explicit instruction, or `strict:true` for schema-valid arguments • no assistant prefill • the dual-use safety measures mean a declined request returns HTTP 200 with `stop_reason:"refusal"` and a `stop_details.category`, not an exception — branch on `stop_reason` before reading `content`.
-- **Codex CLI (probed locally against codex-cli 0.144.1):** the API's validation error enumerates the real effort ladder — `none`, `minimal`, `low`, `medium`, `high`, `xhigh`, `max`. `ultra` is **not** on it.
+- **Codex CLI (re-probed against codex-cli 0.153.4, 2026-09-07):** the effort ladder is **per-model**, not global. GPT-5.x: `none`, `minimal`, `low`, `medium`, `high`, `xhigh`, `max` — `ultra` absent. **Astra: `low`, `medium`, `high`, `xhigh`, `max`, `ultra`** — and `ultra` runs. The earlier "ultra is never a reasoning tier" note was probed on 0.144.1, before Astra existed; it was right then and is wrong now. Re-probe the ladder when a new model lands.
 
 ## Fable 5.1 routing — the apex tier, and the meter that governs it
 
@@ -179,8 +250,6 @@ Use `runner: main` sparingly — typically the final chunk in a chain when integ
 - **The seat is the one standing exception.** Orchestration is the highest-leverage surface in a run — a bad cut or a wrong reconciliation is the error no `verification` command catches — so the apex tier takes the seat while the meter allows it.
 - **When the meter runs out, Opus 5 takes the seat and the run continues unchanged.** Say so in one line; don't stall, don't ask, don't downgrade further. Nothing in the six-question triage, the manifest contract, the runner enum, or the QA gates depends on Fable being available — a Fable-exhausted session routes exactly like a Fable-present one minus the `fable-subagent` lane.
 
-Why the seat stays Opus 5, in one line each: it is the more intelligent seat outright; the seat pays its premium on every coordination turn (~80% of them); orchestration is agentic and Opus 5 is the agentic flagship; the seat's knowledge cutoff is load-bearing (it reasons about the lineup it is routing); apex reasoning belongs at the few *gates* verification can't catch, not across the whole session; and latency is free in a background delegate but exposed in the interactive seat. Full argument with evidence: `references/routing.md` → "Seat topology".
-
 **Where Fable 5.1 earns a delegate spawn** — beyond the seat, escalate on a *narrow, high-leverage* sub-problem. Shape check first: if the plateaued sub-problem is *agentic-grind-shaped* (a long terminal/tool-loop execution slog rather than a judgment problem), a Codex `gpt-5.5` chunk is the better escalation and leaves the meter alone.
 
 | Use Fable 5.1 for | Spawn |
@@ -194,17 +263,17 @@ Why the seat stays Opus 5, in one line each: it is the more intelligent seat out
 
 - Fable spawns natively via the Agent tool — the `model` field accepts `sonnet | opus | haiku | fable`, so `Agent(subagent_type="general-purpose", model="fable", run_in_background=True, ...)` is all it takes. Unlike 1M-Opus, **no CLI subprocess is required**. Use one only if the Fable chunk also needs a >150K read surface or isolated MCP/hooks.
 - Runner enum: `fable-subagent` is wired into `delegate.sh validate` and `references/manifest-schema.md`. Step 6 fan-out uses the standard spawn block with `model="fable"`.
-- Thinking and effort quirks for raw CLI/API calls: see **Model Facts** → "API quirks". Effort defaults to `high`, not `xhigh`, on both tiers — climb only on a concrete signal (the delegate self-reports low confidence, its verdict conflicts with both Step 10.5 reviewers, or its output fails verification).
-- Discipline: Fable is **not** model-diversity for QA — it's still a Claude model. Codex remains the cross-family reviewer; Fable is depth, not diversity. Effort defaults to `high`, not `xhigh` — reflexive `max` on a metered tier is the fastest way to lose the budget you were saving.
+- Thinking and effort quirks for raw CLI/API calls: see **Model Facts** → "API quirks". Effort defaults to `high`, not `xhigh` — climb only on a concrete signal (the delegate self-reports low confidence, its verdict conflicts with both Step 10.5 reviewers, or its output fails verification). Reflexive `max` on a metered tier is the fastest way to lose the budget you were saving.
+- Discipline: Fable is **not** model-diversity for QA — it's still a Claude model. Codex remains the cross-family reviewer; Fable is depth, not diversity.
 
 ## Effort Levels per Runner
 
 | Runner | Effort control | Default | Override |
 |--------|---------------|---------|----------|
-| **Orchestrator (Opus 5)** | Adaptive thinking (`xhigh` default in Claude Code); **explicit ultrathink at the planning gate** | Full + adaptive | Stay on Opus 5; never switch to Sonnet manually. Adaptive thinking is on by default here (new in Opus 5) — but at the decomposition gate (Step 2), *force* the ceiling with ultrathink rather than trusting adaptivity to find it; a bad cut is the one orchestrator error no verification catches |
+| **Orchestrator (Fable 5.1, else Opus 5)** | Always-on thinking + `effort` on Fable; adaptive thinking (`xhigh` default in Claude Code) on Opus 5. **Explicit ultrathink at the planning gate on either** | Full + adaptive | Never switch the seat to Sonnet manually, and never below Opus 5 when Fable runs out. At the decomposition gate (Step 2), *force* the ceiling with ultrathink rather than trusting adaptivity to find it; a bad cut is the one orchestrator error no verification catches |
 | **Apex (Fable 5.1)** | `effort` (sweep `medium`/`high`/`xhigh`) + always-on thinking | `high` | Start at `high`, not `xhigh`; climb only if the sub-problem demands it. Never send `thinking:{type:"disabled"}` (400 on Fable — omit the param). The tier is metered: default effort is part of the budget rule |
 | **Sonnet subagents (Sonnet 5)** | Model tier + adaptive thinking | Adaptive (default) | Set `thinking="extended"` for genuinely deliberative tasks (math, multi-step symbolic reasoning); default OFF for code chunks — extended thinking measurably hurts on intuitive tasks (**Model Facts**) |
-| **Codex (GPT-5.6 Sol)** | `CODEX_EFFORT` env var → `model_reasoning_effort` — real API ladder: `none`/`minimal`/`low`/`medium`/`high`/`xhigh`/`max` | `high` | `CODEX_EFFORT=xhigh` for deep algorithmic work or adversarial review (matches the local config pin). **`ultra` is not on this ladder** — it's a CLI-level orchestration switch that spawns Codex's own subagent fan-out. Permitted ONLY for standalone wholesale Codex tasks where Codex owns the whole job; never inside a delegate-run chunk — it double-orchestrates against the manifest contract |
+| **Codex (GPT-5.6 Sol)** | `CODEX_EFFORT` env var → `model_reasoning_effort` — real API ladder: `none`/`minimal`/`low`/`medium`/`high`/`xhigh`/`max` | `high` (quality-first) | `CODEX_EFFORT=xhigh` for deep algorithmic work or adversarial review (matches the local config pin). **`ultra` is not on this ladder** — it's a CLI-level orchestration switch that spawns Codex's own subagent fan-out. Never inside a delegate-run chunk (double-orchestrates against the manifest contract); outside one it must clear all four conditions of the **ultra gate** (§ "Codex tier rules"). Depth comes from this ladder, parallelism from `ultra` — don't substitute one for the other |
 | **Haiku 4.5 (Cheap parallel + Explore)** | Model tier + optional extended thinking | OFF | Default OFF for pure lookups/classification/bulk edits. Enable extended thinking only for unambiguous deliberative subtasks — rare for Haiku-suitable work |
 
 **Session advice:** Start on Fable 5.1 if Fable budget is available, otherwise Opus 5 — and stay there. The skill routes sub-runners automatically. Switching to Sonnet manually to "save tokens" just degrades the orchestrator; the planning and QA gates are where the seat earns its keep. Adaptive thinking on Opus is the default — don't fight it; it spends thought where the task warrants it. If Fable runs out mid-session, drop the seat to Opus 5, say so in one line, and carry on.
@@ -248,7 +317,7 @@ The orchestrator must proactively suggest a handoff when it detects diminishing 
 
 ## When to Use Haiku vs Sonnet (the cheap-parallel tier)
 
-Haiku 4.5 is the **volume-and-latency** tier — not primarily a cost play. It earns the spawn when the unit count is high (>10) *and* the verification surface is trivial — "does the output match the spec, yes/no". Use it as Explore subagents (lookups) and as fresh Agent subagents for narrow, mechanically-verifiable chunks. Anything judgment-adjacent goes to Sonnet or Opus.
+Haiku 4.5 is the **volume-and-latency** tier — never a cost play (cost is not a routing input; see "Routing objective"). It earns the spawn when the unit count is high (>10) *and* the verification surface is trivial — "does the output match the spec, yes/no". Use it as Explore subagents (lookups) and as fresh Agent subagents for narrow, mechanically-verifiable chunks. Anything judgment-adjacent goes to Sonnet or Opus.
 
 | Use Haiku | Use Sonnet |
 |-----------|------------|
@@ -268,7 +337,7 @@ Haiku 4.5 is the **volume-and-latency** tier — not primarily a cost play. It e
 
 **Anti-pattern:** routing code-chunk work to Haiku to save money. The Sonnet→Haiku cost savings are real but Haiku will silently miss subtleties — wrong null-handling, wrong import order, wrong test framework — that Sonnet catches. False economy. The Haiku tier earns its keep on tasks where the verification surface is *trivial* (schema check, string equality, lint pass), not "looks like working code".
 
-**If Fable is exhausted or unavailable** (the meter ran out, access lapsed, 400/404 on spawn): do not stall and do not downgrade silently. **Opus 5 takes the seat**, and the replacement for an apex *delegate* is **ultrathink on Opus 5 + an independent Codex GPT-5.6 Sol `--effort high` pass on the same sub-problem**, reconciled by the orchestrator — depth via forced thinking budget, blind-spot coverage via cross-family diversity (Sol sits at near-Fable depth on AA's index — **Model Facts** — so the substitute is credible). Note in the run log that the apex tier was substituted.
+**If Fable is exhausted or unavailable** (the meter ran out, access lapsed, 400/404 on spawn): do not stall and do not downgrade silently. **Opus 5 takes the seat**, and the replacement for an apex *delegate* is **ultrathink on Opus 5 + an independent Codex `gpt-5.5` `--effort high` pass on the same sub-problem**, reconciled by the orchestrator — depth via forced thinking budget, blind-spot coverage via cross-family diversity (the Codex tier sits close to Fable-5 depth on AA's index — **Model Facts** — so the substitute is credible). Note in the run log that the apex tier was substituted. Everything else in the flow is unchanged.
 
 ## 1M Context Routing — a fresh 1M session as a delegation target (never the orchestrator seat)
 
@@ -288,6 +357,16 @@ Haiku 4.5 is the **volume-and-latency** tier — not primarily a cost play. It e
 - Task decomposes into independent sub-units → fan out instead. Decomposition beats brute-force-context every time.
 - You only need keyword/symbol lookup → Haiku Explore subagent + grep.
 - The orchestrator session is full → handoff, not 1M flip.
+
+**⛔ PRECONDITION — probe the CLI login before routing anything here.** `opus-1m-cli` shells out to the standalone `claude` binary, which authenticates **separately from the session you are sitting in**. On one machine (probed 2026-09-07) it is **not logged in**: `claude -p "..." --model claude-opus-5` returns *"Not logged in · Please run /login"*. Not a sandbox artefact and not an inherited-env artefact — it reproduces with the sandbox disabled and with every `CLAUDE_*` variable unset, while the keychain credential itself reads fine from the same shell. The app-hosted session is authenticated; the CLI is a different client and has its own login.
+
+So: **probe first, route second.** One cheap command, and it costs nothing next to discovering this mid-run on a chunk you have already decomposed for:
+
+```bash
+claude -p "reply OK" --model claude-opus-5 </dev/null 2>&1 | head -1
+```
+
+Anything but a normal answer means the lane is shut. **Fall back by decomposing** — split the surface into sub-150K chunks and fan them out, which is the better answer in most cases anyway (see "When 1M Opus is NOT the right call"). Only escalate to the user if the surface is genuinely irreducible, and say plainly that the fix is `claude login` in their own terminal — that is their action, not yours.
 
 **Mechanical invocation.** Manifest runner is `opus-1m-cli`; it spawns as a Bash subprocess to the Claude Code CLI, not as an Agent (subagent context is bounded well below 1M whatever the model). Spawn block and its flags: `references/prompt-templates.md` → "`opus-1m-cli` — the 1M subprocess spawn block".
 
@@ -435,9 +514,9 @@ Resolve absolute workspace paths up-front so each chunk gets a self-contained pr
 WS_C1=$({base}/scripts/delegate.sh workspace "$RUN_ID" chunk-1)
 ```
 
-**Give every spawn a standard brief, not an ad-hoc one.** Whatever briefing template you use, every chunk prompt should carry the same spine: operating standards, the evidence rule for any claim it makes back to you, its authority boundaries, and an explicit output contract. The blocks below are the *chunk-specific* contract that goes inside that spine — not a substitute for it. A hand-rolled brief produces a sub-agent that drifts to default habits, and its report becomes your session's claims.
+**Build the brief with the `subagent-brief` skill.** Every spawn — Opus, Sonnet, Haiku, Fable, Codex — gets its prompt built through `subagent-brief`, which bakes in the operator doctrine, the verification-gates rules, the drone persona and first-person voice, the authority boundaries, and the output contract. The blocks below show the *chunk-specific* contract that `subagent-brief` wraps; they are not a substitute for it. A hand-rolled brief produces a drone that drifts to default habits, and its report becomes this session's claims.
 
-**Opus / Sonnet / Fable subagent chunks** — Agent tool, background, no worktree isolation (we don't need git). The `model` field accepts `sonnet | opus | haiku | fable`. Use `model="opus"` (`opus-subagent`) when per-chunk quality dominates, `model="sonnet"` for wide tightly-specified fan-outs, and `model="fable"` only for a named Fable lane with the meter checked. Same prompt shape for all three:
+**Opus / Sonnet / Fable subagent chunks** — Agent tool, background, no worktree isolation (we don't need git). The `model` field accepts `sonnet | opus | haiku | fable`. Quality-first default is `model="opus"` (`opus-subagent`); use `model="sonnet"` only for wide, tightly-specified fan-outs, and `model="fable"` only for a named Fable lane with the meter checked. Same prompt shape for all three:
 ```
 Agent(
   subagent_type="general-purpose",
@@ -556,7 +635,7 @@ If anything fails: show the failure, show the offending chunk's `diff` (`delegat
 
 ### Step 10.5 — Dual-model QA review (major runs)
 
-Mechanical QA (Step 10) verifies that tests pass. It does not verify that the code is **good** — correct, idiomatic, safe, free of subtle bugs, complete. For major runs, a second pass is mandatory: **Opus 5 reviews in the main session, Codex GPT-5.6 Sol reviews in a fresh background context, both in parallel, then the orchestrator reconciles and fixes.**
+Mechanical QA (Step 10) verifies that tests pass. It does not verify that the code is **good** — correct, idiomatic, safe, free of subtle bugs, complete. For major runs, a second pass is mandatory: **Opus 5 reviews in the main session, Codex `gpt-5.5` reviews in a fresh background context, both in parallel, then the orchestrator reconciles and fixes.**
 
 #### When this step fires (the "major" trigger)
 
@@ -579,7 +658,7 @@ For runs that don't trip any trigger (1-2 chunk runs, scratch work, prototypes),
 **1. Spawn both reviews in parallel** (same message, two tool calls):
 
 - **Opus review** — Agent tool, `subagent_type="general-purpose"`, no `model=` override (inherits Opus from the orchestrator session). Fresh context window — the subagent has not seen the build conversation, so it reviews the applied code cold. Hand it: the project path, the list of files changed, the original task description, the manifest, and the review dimensions below.
-- **Codex review** — `{base}/codex/scripts/codex.sh run` with `--effort high --model gpt-5.5`, background. Hand it the same brief. Codex's review writes `review-codex.md` to a temp workspace. (Sol finds more real bugs than 5.5 did, but at low precision it is noisy — the reconciliation step exists to filter nitpicks, so expect a longer raw list, not a worse one. Never substitute Terra here: measured recall regression. Figures: **Model Facts**.)
+- **Codex review** — `{base}/codex/scripts/codex.sh run` with `--effort high --model gpt-5.5`, background. Hand it the same brief. Codex's review writes `review-codex.md` to a temp workspace. (Sol used to hold this lane and found more real bugs than 5.5 at lower precision — but Sol is no longer servable on this account, so `gpt-5.5` is the review model. Never substitute Terra here: measured recall regression. Figures: **Model Facts**.)
 
 Both reviewers MUST be given:
 - The original task and manifest (so they know what was supposed to be built).
@@ -673,7 +752,7 @@ Full detail — parity gaps, the trigger table, the CLI-subprocess trade-off tab
 ## Anti-Patterns
 
 - Do NOT report a spawned chunk as "running" without a `liveness` observation. A missing completion notification means *unknown*, not alive — a hung agent never emits a stop event.
-- Do NOT hand-roll a chunk brief per chunk. Use one standard briefing spine for every spawn; an ad-hoc brief produces a sub-agent that drifts to default habits, and its report becomes your session's claims.
+- Do NOT hand-roll a chunk brief. Every spawn goes through the `subagent-brief` skill; a hand-rolled drone drifts to default habits and its report becomes this session's claims.
 - Do NOT put a model figure anywhere outside **Model Facts**. Numbers restated in a routing table go stale silently and mis-route at the moment of choice — reference the lane, not the decimal. `scripts/check-model-facts.sh` enforces this; run it after any model-layer edit.
 - Do NOT ship a gate you have only tested on synthetic state. A gate that fails *open* — reporting OK over a destroyed run, or dying before it evaluates the remaining chunks — is worse than no gate, because it converts "unknown" into a false "fine". Test every verdict path, including the ones that should refuse.
 - Do NOT delegate a chunk that touches the same file as a concurrent chunk. `validate` will refuse to run, but don't try.
@@ -697,9 +776,7 @@ Full detail — parity gaps, the trigger table, the CLI-subprocess trade-off tab
 - Do NOT default Fable to `xhigh`/`max` — start at `high`, climb only on a concrete signal. Reflexive `max` on a metered tier is the fastest way to spend the budget you were protecting.
 - Do NOT accept a Codex Sol chunk's self-reported "tests pass" — METR measured GPT-5.6 Sol with the highest reward-hacking rate of any public model they've assessed. The orchestrator's own Step 10 QA run is the only evidence that counts.
 - Do NOT route Codex work to Terra or Luna — Terra measurably regresses on adversarial review and bloats long-horizon token spend; Luna duplicates Haiku's lane. Sol is the only 5.6 tier this skill calls.
-- Do NOT use Codex `ultra` inside a delegate run — it is not a reasoning tier at all (the API effort enum is `none`/`minimal`/`low`/`medium`/`high`/`xhigh`/`max`); it is a CLI-level switch that spawns Codex's own subagent fan-out and double-orchestrates against the manifest contract. (Standalone wholesale Codex tasks MAY use `ultra` — the ban is contract-scoped, not quality-scoped.)
+- Do NOT use Codex `ultra` inside a delegate run — it is not a reasoning tier at all (the API effort enum is `none`/`minimal`/`low`/`medium`/`high`/`xhigh`/`max`); it is a CLI-level switch that spawns Codex's own subagent fan-out and double-orchestrates against the manifest contract. (Standalone wholesale Codex tasks MAY use `ultra` — the ban is contract-scoped, not quality-scoped — but only after clearing all four conditions of the **ultra gate** in § "Codex tier rules". Failing the gate, reach for `--effort xhigh`/`max`.)
 - Do NOT escalate to Fable 5.1 without naming the lane. It genuinely sits above Opus 5, so the old capability argument for holding back is gone — but the meter is finite, so "this is hard" is not a lane. Long-horizon autonomy, hardest-repo judgment, a plateaued correctness cut, a blocker tie-break. Name one or stay in-seat.
 - Do NOT route to Fable 5 (`claude-fable-5`). Fable 5.1 supersedes it in the same tier at the same per-token price; there is no remaining lane for 5. Mythos 5.1 is the same model behind an approved-organisation gate — not a route unless the account has it.
 - Do NOT route new work to Opus 4.8. Opus 5 supersedes it at identical pricing with a better score on every published benchmark. There is no remaining lane for 4.8 in this skill.
-
-
