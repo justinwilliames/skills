@@ -32,6 +32,7 @@ The gap between a frontier model and a merely good one is mostly *operating disc
 | [okr-structuring](okr-structuring/SKILL.md) | OKR scaffolding that enforces graded confidence, outcome-not-output framing, and per-KR measurement contracts |
 | [slack-writer](slack-writer/SKILL.md) | Operator-grade Slack copy: authority-first, zero throat-clearing, slop-detection pipeline included |
 | [linkedin-post-writer](linkedin-post-writer/SKILL.md) | LinkedIn posts built from your voice guide: three proven structures, no-fabrication rules, banner compositor |
+| [linkedin-cover-builder](linkedin-cover-builder/SKILL.md) | LinkedIn cover photos from a swappable brand kit — one fixed layout that survives a change of employer, behind six measured gates |
 
 ## Video — applied craft
 
