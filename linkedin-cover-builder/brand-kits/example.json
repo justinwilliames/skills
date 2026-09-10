@@ -1,0 +1,39 @@
+{
+  "_comment": "Copy this file, rename it for your employer, and replace every value. Paths may be absolute or relative to this file. Nothing here is company-specific — these are neutral placeholder values chosen to demonstrate the shape.",
+
+  "brand": "Example Co",
+
+  "logo": null,
+  "wordmark_text": "Example",
+  "logo_width": 206,
+
+  "font": "~/Library/Fonts/YourBrandDisplay-Variable.ttf",
+  "font_weight_display": 800,
+  "headline_size": 45,
+  "subline_size": 18.5,
+
+  "colors": {
+    "_comment": "headline/subline are type. surface is the field's interior; canvas is what every edge feathers to — set canvas to the page background the cover will sit against. aura is [sky, lit, deep]: a mid brand hue, a near-white lift of it, and a deep undertone. kiss is an optional fourth accent, or null.",
+    "headline": "#101828",
+    "subline": "#475467",
+    "surface": "#F8F8F6",
+    "canvas": "#F4F4F2",
+    "aura": ["#7EC8F0", "#DCEFFA", "#3F51B5"],
+    "kiss": null
+  },
+
+  "copy": {
+    "_comment": "headline is an array — one entry per line. Two short lines read best at 1584x396; three is the ceiling. Keep each line under about 22 characters so it never wraps.",
+    "headline": ["Short claim here.", "Second line here."],
+    "subline": "One plain sentence saying what the company does."
+  },
+
+  "photo": "~/Pictures/your-portrait.jpg",
+  "photo_width": 648,
+  "photo_anchor_x": 0.5,
+  "photo_anchor_y": 0.25,
+
+  "_layout_comment": "content_left defaults to 408px, which clears LinkedIn's desktop profile circle (measured to end at 368px) with a 40px gap. Only lower it if you have removed the text from the lower left.",
+  "content_left": 408,
+  "content_width": 600
+}
