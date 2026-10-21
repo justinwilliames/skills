@@ -418,6 +418,8 @@ So: **probe first, route second.** One cheap command, and it costs nothing next 
 claude -p "reply OK" --model claude-opus-5-5 </dev/null 2>&1 | head -1
 ```
 
+**No `claude` binary (desktop-app sessions; observed 2026-10-22: `command not found: claude`) → route the chunk to an Opus 5.5 subagent instead** (`Agent(model="opus")`). Opus 5.5 has a native 1M window, so the subagent covers the large-surface lane without the CLI; brief it to read the surface itself and return findings only, so the seat stays lean. Same if the probe returns an auth error and the user is not at the keyboard to log in.
+
 Anything but a normal answer means the lane is shut. **Fall back by decomposing** — split the surface into sub-150K chunks and fan them out, which is the better answer in most cases anyway (see "When 1M Opus is NOT the right call"). Only escalate to the user if the surface is genuinely irreducible, and say plainly that the fix is `claude login` in their own terminal — that is their action, not yours.
 
 **Mechanical invocation.** Manifest runner is `opus-1m-cli`; it spawns as a Bash subprocess to the Claude Code CLI, not as an Agent (subagent context is bounded well below 1M whatever the model). Spawn block and its flags: `references/prompt-templates.md` → "`opus-1m-cli` — the 1M subprocess spawn block".
