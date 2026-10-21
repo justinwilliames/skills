@@ -165,7 +165,7 @@ OUTPUT:
   --dir "$WS" \
   --sandbox workspace-write \
   --effort high \
-  --model gpt-5.5
+  --model gpt-6-astra
 ```
 
 `--effort high` is the default for review mode (deeper reasoning matters more than speed for second-opinion work).
@@ -258,7 +258,7 @@ Keep it tight enough to paste without hesitation.
 
 > Moved here from SKILL.md 2026-07-30 (R10 economy pass). SKILL.md carries the routing rule; this is the invocation.
 
-The Agent tool's `model` param accepts `opus|sonnet|haiku|fable`, so a Fable *delegate* spawns natively — but a **1M context window** does not: subagent context is bounded by the orchestrator's allowance, well below 1M, whatever the model. For a genuine >150K read surface, route via a Bash subprocess to the Claude Code CLI. Opus 5's native 1M window means a plain `--model claude-opus-5` holds the full window — no special variant string.
+The Agent tool's `model` param accepts `opus|sonnet|haiku|fable`, so a Fable *delegate* spawns natively — but a **1M context window** does not: subagent context is bounded by the orchestrator's allowance, well below 1M, whatever the model. For a genuine >150K read surface, route via a Bash subprocess to the Claude Code CLI. Opus 5.5's native 1M window means a plain `--model claude-opus-5-5` holds the full window — no special variant string.
 
 ```bash
 claude -p "$(cat <<'EOF'
@@ -275,7 +275,7 @@ Verification: <command to run on completion>
 Report: final file list + verification result.
 EOF
 )" \
-  --model 'claude-opus-5' \
+  --model 'claude-opus-5-5' \
   --permission-mode plan \
   --add-dir /path/to/project
 ```

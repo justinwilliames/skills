@@ -36,7 +36,7 @@ Commands:
 
 Options:
   --dir PATH         Working directory (default: current)
-  --model MODEL      Override model (default: from config.toml)
+  --model MODEL      Override model (default: gpt-6.1-sol)
   --effort LEVEL     Reasoning effort: minimal|low|medium|high|xhigh
   --sandbox MODE     Sandbox: read-only|workspace-write|danger-full-access
   --image FILE       Attach an image (repeatable)
@@ -74,8 +74,8 @@ parse_common_flags() {
     # Sets globals: PROMPT, DIR, MODEL, EFFORT, SANDBOX, IMAGES[], EPHEMERAL, SCHEMA, ADD_DIRS[], SEARCH
     PROMPT=""
     DIR=""
-    MODEL=""
-    EFFORT=""
+    MODEL="gpt-6.1-sol"
+    EFFORT="high"
     SANDBOX=""
     IMAGES=()
     EPHEMERAL=false

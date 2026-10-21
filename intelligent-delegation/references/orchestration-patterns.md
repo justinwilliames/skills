@@ -165,7 +165,7 @@ State the call out loud when reaching for it, like every other delegation call:
 
 | Gains | Costs |
 |-------|-------|
-| Full 1M-token context per chunk (`--model claude-opus-5`, native 1M) | Process spawn latency (~2–4s per launch) |
+| Full 1M-token context per chunk (`--model claude-opus-5-5`, native 1M) | Process spawn latency (~2–4s per launch) |
 | Independent hooks / MCP / settings | No streaming back to the orchestrator (scrape stdout) |
 | True session isolation | No `task-notification` token telemetry; harder to capture |
 | Survives orchestrator session limits | Permission prompts unless `--permission-mode plan` or pre-approved |

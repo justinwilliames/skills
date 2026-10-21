@@ -49,7 +49,7 @@
 
 ```bash
 # Model and reasoning
--c model="gpt-5.5"
+-c model="gpt-6-sol"
 -c model_reasoning_effort="high"       # low|medium|high|xhigh|max|ultra (5.6 ladder)
 -c model_reasoning_summary="detailed"   # auto|concise|detailed|none
 
@@ -67,14 +67,16 @@
 
 | Model | Use Case |
 |-------|----------|
-| `gpt-5.6-sol` | ⛔ **Not servable on ChatGPT-account auth since 12 Aug 2026** — calls 400 with "not supported when using Codex with a ChatGPT account". Historical: GPT-5.6 flagship (2026-07-09), led terminal/tool-loop agentic work, near-Fable depth (AA II 59 vs 60). |
-| `gpt-5.5` | **The default here.** Frontier tier still on the account — complex coding, research, adversarial review. |
-| `gpt-5.6-terra` | Balanced agentic model — the target for screen-driving / Computer Use (`codex-cu.sh` defaults to it). Not for adversarial review (measured recall regression). |
-| `gpt-5.6-luna` / `gpt-5.4-mini` | Fast/cheap tiers. Duplicate Claude lanes; not quality-first targets. |
-| `gpt-5.6-terra` | 5.6 mid-tier — do NOT use for adversarial review (measured −8.6pp recall regression) or long-horizon work (verbose) |
-| `gpt-5.6-luna` | 5.6 efficient tier — duplicates Haiku's lane; unused in this skill |
-| `gpt-5.5` | Previous flagship, still available (not deprecated) — fallback if 5.6 misbehaves |
-| `gpt-5.4` | Older generation |
+| `gpt-6.1-sol` | **Default, effort `high`.** Code builds, renders, refactors, scraping, distillation, mechanical spec/doc edits, data wrangling. |
+| `gpt-6-astra` | Adversarial review, screen-driving / `codex-cu.sh`, long terminal grind, nuanced editorial/copy rewriting where voice quality matters. Always pin effort `high`, `xhigh` for the hardest. Not a default upgrade. |
+| `gpt-6-luna` | Floor tier, always `-c model_reasoning_effort="high"`. Simple, high-volume, easily verified tasks only; never long-context reads. Usable recall unmeasured. |
+| `gpt-6-sol` | Fallback when a target 400s; probed serving 2026-10-22. |
+| `gpt-5.5` | Retired: 400 "not supported when using Codex with a ChatGPT account" on 2026-10-22. |
+| `gpt-6-sol` | Previous generation workhorse; no lane. |
+| `gpt-5.6-sol` / `gpt-5.6-terra` / `gpt-5.6-luna` | Superseded for default routing. Historical evidence and availability notes: SKILL.md → **Model Facts** and `references/routing.md`. |
+| `gpt-reserve` / `codex-auto-review` | Cache-listed; no routing lane. |
+
+Cache re-read and owner-reported serving probes: **2026-10-22**; exact quotes in SKILL.md → **Model Facts**. No published benchmarks checked for GPT-6.1 Sol or GPT-6 Luna; lanes from Codex's own descriptions and owner decision.
 
 ## Reasoning Effort (GPT-5.6 ladder)
 

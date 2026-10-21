@@ -556,8 +556,8 @@ cmd_codex() {
   local ws; ws=$(workspace_of "$run_id" "$chunk_id")
   [[ -d $ws ]] || { print_error "no workspace for $chunk_id (run prepare first)"; exit 1; }
 
-  local CODEX_BIN="${CODEX_BIN:-/Applications/Codex.app/Contents/Resources/codex}"
-  if [[ ! -x $CODEX_BIN ]]; then
+  local CODEX_BIN="${CODEX_BIN:-$(command -v codex)}"
+  if [[ -z $CODEX_BIN || ! -x $CODEX_BIN ]]; then
     print_error "codex binary not found: $CODEX_BIN (set CODEX_BIN env var)"
     exit 1
   fi
@@ -566,8 +566,9 @@ cmd_codex() {
   local log="$chunk_dir/codex.jsonl"
   local prompt_file="$chunk_dir/codex.prompt"
   local stderr_file="$chunk_dir/codex.stderr"
-  local model="${CODEX_MODEL:-gpt-5.5}"
-  local effort="${CODEX_EFFORT:-medium}"
+  local effort="${CODEX_EFFORT:-high}"
+  # Owner-approved default (2026-10-22); CODEX_MODEL selects a specialist lane.
+  local -a model_args=(-m "${CODEX_MODEL:-gpt-6.1-sol}")
 
   # Feed the prompt via stdin from a tempfile (`-` tells codex to read stdin).
   # Avoids the argv-quoting bug class — complex prompts with newlines, embedded
@@ -580,7 +581,7 @@ cmd_codex() {
   "$CODEX_BIN" exec --skip-git-repo-check --json \
     -C "$ws" \
     -s workspace-write \
-    -m "$model" \
+    ${model_args[@]+"${model_args[@]}"} \
     -c "model_reasoning_effort=\"$effort\"" \
     - <"$prompt_file" >"$log" 2>>"$stderr_file" || rc=$?
 
