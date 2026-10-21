@@ -566,7 +566,7 @@ cmd_codex() {
   local log="$chunk_dir/codex.jsonl"
   local prompt_file="$chunk_dir/codex.prompt"
   local stderr_file="$chunk_dir/codex.stderr"
-  local effort="${CODEX_EFFORT:-high}"
+  local effort="${CODEX_EFFORT:-medium}"
   # Owner-approved default (2026-10-22); CODEX_MODEL selects a specialist lane.
   local -a model_args=(-m "${CODEX_MODEL:-gpt-6.1-sol}")
 
